@@ -1,0 +1,8 @@
+build
+!.vscode/*
+.venv
+.vip-venv
+
+.DS_Store
+temp
+log

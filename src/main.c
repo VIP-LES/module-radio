@@ -22,6 +22,11 @@ void main()
 {
     // --- INITIALIZE MODULE ---
     leos_log_init_console(ULOG_INFO_LEVEL);
+
+    // DEBUG
+    while (!stdio_usb_connected())
+        sleep_ms(100);
+
     MCP251XFD dev;
     leos_cyphal_node_t node;
     if (init_module(&dev, &node) < 0) {

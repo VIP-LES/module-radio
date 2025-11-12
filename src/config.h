@@ -10,6 +10,11 @@ extern leos_mcp251xfd_config_t can_config;
 #define RADIO_UART_BAUD_RATE 9600
 #define RADIO_UART_TX_PIN 0
 #define RADIO_UART_RX_PIN 1
+
+#define RADIO_NETWORK_ID "1234"
+#define RADIO_DEST_ADDR_H "0013A200" // Change this! (Serial Number High)
+#define RADIO_DEST_ADDR_L "41CB8CD8" // Change this! (Serial Number Low)
+
 // ------------------------------------------
 
 // !!!!!!!!!!! IMPORTANT !!!!!!!!!!!

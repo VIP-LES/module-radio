@@ -23,6 +23,13 @@ void radio_cyphal_rx_callback(struct CanardRxTransfer* transfer, void* user_refe
         transfer->metadata.port_id,
         transfer->payload.size);
 
+    const uint8_t* payload_bytes = (const uint8_t*)transfer->payload.data;
+
+    for (size_t i = 0; i < transfer->payload.size; i++) {
+        uint8_t ch = payload_bytes[i];
+        LOG_INFO("[CYPHAL_RX]: 0x%02X\n", ch);
+    }
+
     // Transmit the raw Cyphal payload over the radio
     radio_transmit((const uint8_t*)transfer->payload.data, transfer->payload.size);
 }

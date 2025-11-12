@@ -4,7 +4,19 @@
 #include "leos/mcp251xfd.h"
 #include "module_setup.h"
 #include "pico/stdlib.h"
+#include "pico/time.h"
 #include "radio_transport.h"
+#include "string.h"
+
+void check_radio_uart_rx(void)
+{
+    while (uart_is_readable(RADIO_UART_ID)) {
+        // Read one byte
+        uint8_t ch = uart_getc(RADIO_UART_ID);
+
+        LOG_INFO("[RADIO_RX]: 0x%02X\n", ch);
+    }
+}
 
 void main()
 {
@@ -16,6 +28,13 @@ void main()
         LOG_ERROR("A critical communications error has occurred. This node is offline.");
         return;
     }
+
+    // DEBUG
+
+    absolute_time_t last_debug_time = get_absolute_time();
+    const uint32_t debug_interval_ms = 1000;
+
+    // END DEBUG
 
     leos_cyphal_result_t sub_result = leos_cyphal_subscribe(
         &node,
@@ -43,8 +62,18 @@ void main()
         leos_mcp251xfd_task(&dev);
         leos_cyphal_task(&node);
 
-        // subscription already handled in callback
+        absolute_time_t now = get_absolute_time();
 
-        // Your looping code goes here
+        if (absolute_time_diff_us(last_debug_time, now) / 1000 > debug_interval_ms) {
+            last_debug_time = now;
+
+            LOG_INFO("DEBUG: Main loop running @ %llu\n", time_us_64());
+
+            const char* msg = "DEBUG: Main loop running\r\n";
+            radio_transmit((const uint8_t*)msg, strlen(msg));
+        }
+
+        // --- 2. Check for data *from* the radio ---
+        check_radio_uart_rx();
     }
 }

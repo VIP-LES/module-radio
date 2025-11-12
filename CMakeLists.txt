@@ -47,16 +47,16 @@ file(GLOB SRC_FILES
     src/*.cpp
 )
 
-add_executable(TEMPLATE_PICO ${SRC_FILES})
-pico_set_program_name(TEMPLATE_PICO "CHANGE THIS")
-pico_set_program_version(TEMPLATE_PICO "0.1")
+add_executable(RADIO_MODULE_PICO ${SRC_FILES})
+pico_set_program_name(RADIO_MODULE_PICO "CHANGE THIS")
+pico_set_program_version(RADIO_MODULE_PICO "0.1")
 
 # Modify the below lines to enable/disable output over UART/USB
-pico_enable_stdio_uart(TEMPLATE_PICO 0)
-pico_enable_stdio_usb(TEMPLATE_PICO 1)
+pico_enable_stdio_uart(RADIO_MODULE_PICO 0)
+pico_enable_stdio_usb(RADIO_MODULE_PICO 1)
 
 # Add required template libraries
-target_link_libraries(TEMPLATE_PICO
+target_link_libraries(RADIO_MODULE_PICO
         pico_stdlib
         leos_log
         leos_mcp251xfd
@@ -65,9 +65,9 @@ target_link_libraries(TEMPLATE_PICO
 )
 
 # Add the standard include files to the build
-target_include_directories(TEMPLATE_PICO PUBLIC
+target_include_directories(RADIO_MODULE_PICO PUBLIC
     ${PROJECT_SOURCE_DIR}/src
 )
 
-pico_add_extra_outputs(TEMPLATE_PICO)
+pico_add_extra_outputs(RADIO_MODULE_PICO)
 

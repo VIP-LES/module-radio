@@ -54,7 +54,7 @@ bool enter_command_mode()
     sleep_ms(1100);
 
     // Wait for "OK\r"
-    bool success = read_uart_response("OK", 1100);
+    bool success = read_uart_response("OK\n", 1100);
 
     if (!success) {
         LOG_CRITICAL("Failed to enter AT Command Mode. Is XBee connected and powered?\n");

@@ -1,7 +1,7 @@
 #include "radio_transport.h"
+#include "config.h"
 #include "hardware/uart.h"
 #include "leos/log.h"
-#include "module_setup.h"
 
 void radio_transmit(const uint8_t* data, size_t len)
 {

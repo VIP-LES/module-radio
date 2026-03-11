@@ -8,15 +8,15 @@
 #include "radio_transport.h"
 #include "string.h"
 
-void check_radio_uart_rx(void)
-{
-    while (uart_is_readable(RADIO_UART_ID)) {
-        // Read one byte
-        uint8_t ch = uart_getc(RADIO_UART_ID);
+// void check_radio_uart_rx(void)
+// {
+//     while (uart_is_readable(RADIO_UART_ID)) {
+//         // Read one byte
+//         uint8_t ch = uart_getc(RADIO_UART_ID);
 
-        LOG_INFO("[RADIO_RX]: 0x%02X\n", ch);
-    }
-}
+//         LOG_INFO("[RADIO_RX]: 0x%02X\n", ch);
+//     }
+// }
 
 void main()
 {
@@ -29,7 +29,8 @@ void main()
 
     MCP251XFD dev;
     leos_cyphal_node_t node;
-    if (init_module(&dev, &node) < 0) {
+    if (init_module(&dev, &node) < 0)
+    {
         LOG_ERROR("A critical communications error has occurred. This node is offline.");
         return;
     }
@@ -47,12 +48,15 @@ void main()
         CYPHAL_PORT_ID_TO_FORWARD,
         CYPHAL_MESSAGE_EXTENT,
         radio_cyphal_rx_callback, // This function forwards to the radio
-        NULL // No user reference needed
+        NULL                      // No user reference needed
     );
 
-    if (sub_result != LEOS_CYPHAL_OK) {
+    if (sub_result != LEOS_CYPHAL_OK)
+    {
         LOG_ERROR("Failed to subscribe to Port ID %d. Error: %d", CYPHAL_PORT_ID_TO_FORWARD, sub_result);
-    } else {
+    }
+    else
+    {
         LOG_INFO("Subscribed to Cyphal Port ID %d for XBee forwarding", CYPHAL_PORT_ID_TO_FORWARD);
     }
 
@@ -63,22 +67,24 @@ void main()
 
     // --- MAIN LOOP ---
     LOG_INFO("Entering main loop...");
-    while (true) {
+    while (true)
+    {
         leos_mcp251xfd_task(&dev);
         leos_cyphal_task(&node);
 
         absolute_time_t now = get_absolute_time();
 
-        if (absolute_time_diff_us(last_debug_time, now) / 1000 > debug_interval_ms) {
+        if (absolute_time_diff_us(last_debug_time, now) / 1000 > debug_interval_ms)
+        {
             last_debug_time = now;
 
             LOG_INFO("DEBUG: Main loop running @ %llu\n", time_us_64());
 
-            const char* msg = "DEBUG: Main loop running\r\n";
-            radio_transmit((const uint8_t*)msg, strlen(msg));
+            // const char *msg = "DEBUG: Main loop running\r\n";
+            // radio_transmit((const uint8_t *)msg, strlen(msg));
         }
 
         // --- 2. Check for data *from* the radio ---
-        check_radio_uart_rx();
+        // check_radio_uart_rx();
     }
 }

@@ -10,97 +10,108 @@
 #include "leos/mcp251xfd/debug.h"
 #include "pico/stdlib.h"
 
-void mcp_read_pending_cb(MCP251XFD* dev, void* node_ref)
+void mcp_read_pending_cb(MCP251XFD *dev, void *node_ref)
 {
-    leos_cyphal_node_t* node = (leos_cyphal_node_t*)node_ref;
+    leos_cyphal_node_t *node = (leos_cyphal_node_t *)node_ref;
     leos_cyphal_rx_process(node);
 }
 
-bool read_uart_response(const char* expected_response, uint timeout_ms)
-{
-    char buffer[32]; // Small buffer for "OK\r" or "ERROR\r"
-    int i = 0;
+// bool read_uart_response(const char *expected_response, uint timeout_ms)
+// {
+//     char buffer[32]; // Small buffer for "OK\r" or "ERROR\r"
+//     int i = 0;
 
-    absolute_time_t end_time = make_timeout_time_ms(timeout_ms);
+//     absolute_time_t end_time = make_timeout_time_ms(timeout_ms);
 
-    while (absolute_time_diff_us(get_absolute_time(), end_time) / 1000 > 0) {
-        if (uart_is_readable(RADIO_UART_ID)) {
-            char c = uart_getc(RADIO_UART_ID);
-            if (c == '\r') {
-                buffer[i] = '\0'; // Null-terminate the string
-                LOG_INFO("XBee responded: \"%s\"\n", buffer);
-                // Check if the buffer starts with the expected response
-                return (strncmp(buffer, expected_response, strlen(expected_response)) == 0);
-            } else if (i < (sizeof(buffer) - 1)) {
-                buffer[i++] = c;
-            }
-        }
-    }
+//     while (absolute_time_diff_us(get_absolute_time(), end_time) / 1000 > 0)
+//     {
+//         if (uart_is_readable(RADIO_UART_ID))
+//         {
+//             char c = uart_getc(RADIO_UART_ID);
+//             if (c == '\r')
+//             {
+//                 buffer[i] = '\0'; // Null-terminate the string
+//                 LOG_INFO("XBee responded: \"%s\"\n", buffer);
+//                 // Check if the buffer starts with the expected response
+//                 return (strncmp(buffer, expected_response, strlen(expected_response)) == 0);
+//             }
+//             else if (i < (sizeof(buffer) - 1))
+//             {
+//                 buffer[i++] = c;
+//             }
+//         }
+//     }
 
-    LOG_INFO("XBee response timed out.\n");
-    return false; // Timeout
-}
+//     LOG_INFO("XBee response timed out.\n");
+//     return false; // Timeout
+// }
 
-bool enter_command_mode()
-{
-    LOG_INFO("Entering AT Command Mode...\n");
+// bool enter_command_mode()
+// {
+//     LOG_INFO("Entering AT Command Mode...\n");
 
-    // Guard time
-    sleep_ms(1100);
+//     // Guard time
+//     sleep_ms(1100);
 
-    // Send command sequence
-    uart_puts(RADIO_UART_ID, "+++");
+//     // Send command sequence
+//     uart_puts(RADIO_UART_ID, "+++");
 
-    sleep_ms(1100);
+//     sleep_ms(1100);
 
-    // Wait for "OK\r"
-    bool success = read_uart_response("OK\n", 1100);
+//     // Wait for "OK\r"
+//     bool success = read_uart_response("OK\n", 1100);
 
-    if (!success) {
-        LOG_CRITICAL("Failed to enter AT Command Mode. Is XBee connected and powered?\n");
-        // Clear UART buffer in case "+++" was echoed
-        while (uart_is_readable_within_us(RADIO_UART_ID, 100)) {
-            (void)uart_getc(RADIO_UART_ID);
-        }
-    }
+//     if (!success) {
+//         LOG_CRITICAL("Failed to enter AT Command Mode. Is XBee connected and powered?\n");
+//         // Clear UART buffer in case "+++" was echoed
+//         while (uart_is_readable_within_us(RADIO_UART_ID, 100)) {
+//             (void)uart_getc(RADIO_UART_ID);
+//         }
+//     }
 
-    return success;
-}
+//     return success;
+// }
 
 // Sends an AT command and waits for "OK"
-bool send_at_command(const char* command, const char* param)
-{
-    char full_cmd[64];
-    if (param) {
-        snprintf(full_cmd, sizeof(full_cmd), "%s%s\r", command, param);
-        LOG_INFO("Sending: %s%s\n", command, param);
-    } else {
-        snprintf(full_cmd, sizeof(full_cmd), "%s\r", command);
-        LOG_INFO("Sending: %s\n", command);
-    }
+// bool send_at_command(const char *command, const char *param)
+// {
+//     char full_cmd[64];
+//     if (param)
+//     {
+//         snprintf(full_cmd, sizeof(full_cmd), "%s%s\r", command, param);
+//         LOG_INFO("Sending: %s%s\n", command, param);
+//     }
+//     else
+//     {
+//         snprintf(full_cmd, sizeof(full_cmd), "%s\r", command);
+//         LOG_INFO("Sending: %s\n", command);
+//     }
 
-    uart_puts(RADIO_UART_ID, full_cmd);
+//     uart_puts(RADIO_UART_ID, full_cmd);
 
-    bool success = read_uart_response("OK", 1000);
-    if (!success) {
-        LOG_CRITICAL("Command AT%s failed.\n", command);
-    }
-    return success;
-}
+//     bool success = read_uart_response("OK", 1000);
+//     if (!success)
+//     {
+//         LOG_CRITICAL("Command AT%s failed.\n", command);
+//     }
+//     return success;
+// }
 
-int init_module(MCP251XFD* dev, leos_cyphal_node_t* node)
+int init_module(MCP251XFD *dev, leos_cyphal_node_t *node)
 {
     // Setup CANBus Communication
     eERRORRESULT err;
     err = leos_mcp251xfd_init(dev, &can_hw_config, &can_config, true);
-    if (err != ERR_OK) {
+    if (err != ERR_OK)
+    {
         LOG_ERROR("Failed to init MCP251XFD: %s", mcp251xfd_debug_error_reason(err));
         return -1;
     }
     leos_cyphal_transport_t transport = leos_cyphal_transport_mcp251xfd(dev);
     leos_cyphal_result_t can_result;
     can_result = leos_cyphal_init(node, transport, 12);
-    if (can_result != LEOS_CYPHAL_OK) {
+    if (can_result != LEOS_CYPHAL_OK)
+    {
         LOG_ERROR("Failed to initialize Cyphal/Libcanard: %d", can_result);
         return -2;
     }
@@ -115,7 +126,8 @@ int init_module(MCP251XFD* dev, leos_cyphal_node_t* node)
     uart_set_hw_flow(RADIO_UART_ID, false, false);
     LOG_INFO("RADIO UART initialized at %d baud", RADIO_UART_BAUD_RATE);
 
-    if (enter_command_mode()) {
+    if (enter_command_mode())
+    {
         LOG_INFO("Successfully entered AT Command Mode.\n");
 
         // Set Network ID
@@ -135,8 +147,9 @@ int init_module(MCP251XFD* dev, leos_cyphal_node_t* node)
         send_at_command("ATCN", NULL);
 
         LOG_INFO("Configuration complete and saved.\n");
-
-    } else {
+    }
+    else
+    {
         LOG_CRITICAL("Could not configure XBee. Will try to send on existing settings.\n");
     }
 

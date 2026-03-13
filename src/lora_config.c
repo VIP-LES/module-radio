@@ -71,6 +71,10 @@ void config_build_sx1262(leos_radio_config_t *cfg)
     cfg->tx_power_dbm = SX1262_TX_POWER_DBM;
     cfg->crc_enabled = SX1262_CRC_ENABLED;
     cfg->iq_inverted = SX1262_IQ_INVERTED;
+    cfg->bandwidth = SX1262_BANDWIDTH;
+    cfg->coding_rate = SX1262_CODING_RATE
+                           cfg->spreading_factor = SX1262_SPREADING_FACTOR
+                                                       cfg->sync_word = SX1262_SYNC_WORD
 }
 
 void config_build_sx1268(leos_radio_config_t *cfg)
@@ -85,4 +89,8 @@ void config_build_sx1268(leos_radio_config_t *cfg)
     cfg->tx_power_dbm = SX1268_TX_POWER_DBM;
     cfg->crc_enabled = SX1268_CRC_ENABLED;
     cfg->iq_inverted = SX1268_IQ_INVERTED;
+    cfg->bandwidth = SX1268_BANDWIDTH;
+    cfg->coding_rate = SX1268_CODING_RATE
+                           cfg->spreading_factor = SX1268_SPREADING_FACTOR
+                                                       cfg->sync_word = SX1268_SYNC_WORD
 }

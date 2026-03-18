@@ -62,6 +62,7 @@ target_link_libraries(RADIO_MODULE_PICO
         leos_mcp251xfd
         leos_cyphal_transport_mcp251xfd
         leos_cyphal_node
+        leos_sx126x
 )
 
 # Add the standard include files to the build

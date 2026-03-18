@@ -7,8 +7,7 @@ leos_mcp251xfd_hw_t can_hw_config = {
     .pin_mosi = 3,
     .pin_miso = 4,
     .pin_cs = 5,
-    .pin_irq = 6
-};
+    .pin_irq = 6};
 
 MCP251XFD_FIFO fifo_configs[] = {
     {
@@ -35,8 +34,7 @@ MCP251XFD_Filter filter_configs[] = {
      .AcceptanceID = MCP251XFD_ACCEPT_ALL_MESSAGES,
      .AcceptanceMask = MCP251XFD_ACCEPT_ALL_MESSAGES,
      .Match = MCP251XFD_MATCH_SID_EID,
-     .PointTo = MCP251XFD_FIFO1}
-};
+     .PointTo = MCP251XFD_FIFO1}};
 
 leos_mcp251xfd_config_t can_config = {
     .xtal_hz = 40000000, // 40 MHz,
@@ -60,3 +58,39 @@ leos_mcp251xfd_config_t can_config = {
 
     .filter = filter_configs,
     .num_filters = count_of(filter_configs)};
+
+void config_build_sx1262(leos_radio_config_t *cfg)
+{
+    if (cfg == NULL)
+    {
+        return;
+    }
+
+    leos_sx126x_get_default_config(LEOS_RADIO_SX1262, cfg);
+    cfg->rf_frequency_hz = SX1262_RF_FREQUENCY_HZ;
+    cfg->tx_power_dbm = SX1262_TX_POWER_DBM;
+    cfg->crc_enabled = SX1262_CRC_ENABLED;
+    cfg->iq_inverted = SX1262_IQ_INVERTED;
+    cfg->bandwidth = SX1262_BANDWIDTH;
+    cfg->coding_rate = SX1262_CODING_RATE;
+    cfg->spreading_factor = SX1262_SPREADING_FACTOR;
+    cfg->sync_word = SX1262_SYNC_WORD;
+}
+
+void config_build_sx1268(leos_radio_config_t *cfg)
+{
+    if (cfg == NULL)
+    {
+        return;
+    }
+
+    leos_sx126x_get_default_config(LEOS_RADIO_SX1268, cfg);
+    cfg->rf_frequency_hz = SX1268_RF_FREQUENCY_HZ;
+    cfg->tx_power_dbm = SX1268_TX_POWER_DBM;
+    cfg->crc_enabled = SX1268_CRC_ENABLED;
+    cfg->iq_inverted = SX1268_IQ_INVERTED;
+    cfg->bandwidth = SX1268_BANDWIDTH;
+    cfg->coding_rate = SX1268_CODING_RATE;
+    cfg->spreading_factor = SX1268_SPREADING_FACTOR;
+    cfg->sync_word = SX1268_SYNC_WORD;
+}

@@ -2,7 +2,6 @@
 #include "config.h"
 #include "hardware/gpio.h"
 #include "hardware/timer.h"
-#include "hardware/uart.h"
 #include "leos/cyphal/node.h"
 #include "leos/cyphal/transport/mcp251xfd.h"
 #include "leos/log.h"
@@ -11,15 +10,29 @@
 #include "pico/stdlib.h"
 #include "radio.h"
 
-void mcp_read_pending_cb(MCP251XFD *dev, void *node_ref)
+static void mcp_read_pending_cb(MCP251XFD *dev, void *node_ref)
 {
     leos_cyphal_node_t *node = (leos_cyphal_node_t *)node_ref;
     leos_cyphal_rx_process(node);
 }
 
-int init_module(MCP251XFD *dev, leos_cyphal_node_t *node)
+static void dio1_irq_handler(uint gpio, uint32_t events)
 {
-    // Setup CANBus Communication
+    (void)events;
+
+    if (gpio == LEOS_SX1262_PIN_DIO1)
+    {
+        radio_handle_dio1_irq_sx1262();
+    }
+    else if (gpio == LEOS_SX1268_PIN_DIO1)
+    {
+        radio_handle_dio1_irq_sx1268();
+    }
+}
+
+int module_setup_init(MCP251XFD *dev, leos_cyphal_node_t *node)
+{
+    /* Initialize MCP251XFD */
     eERRORRESULT err;
     err = leos_mcp251xfd_init(dev, &can_hw_config, &can_config, true);
     if (err != ERR_OK)
@@ -27,6 +40,8 @@ int init_module(MCP251XFD *dev, leos_cyphal_node_t *node)
         LOG_ERROR("Failed to init MCP251XFD: %s", mcp251xfd_debug_error_reason(err));
         return -1;
     }
+
+    /* Initialize Cyphal node */
     leos_cyphal_transport_t transport = leos_cyphal_transport_mcp251xfd(dev);
     leos_cyphal_result_t can_result = leos_cyphal_init(node, transport, 12);
     if (can_result != LEOS_CYPHAL_OK)
@@ -34,15 +49,32 @@ int init_module(MCP251XFD *dev, leos_cyphal_node_t *node)
         LOG_ERROR("Failed to initialize Cyphal/Libcanard: %d", can_result);
         return -2;
     }
-    // Attach CANBus receive handler
+
+    /* Attach MCP251XFD RX callback so Cyphal receives are drained */
     leos_mcp251xfd_set_rx_handler(dev, mcp_read_pending_cb, node);
 
+    /* Initialize both radios */
     int radio_rc = radio_init();
     if (radio_rc < 0)
     {
         LOG_ERROR("Failed to initialize radios: %d", radio_rc);
         return -3;
     }
+
+    /* Install GPIO interrupt handlers for SX1262 and SX1268 DIO1 pins.
+     * The ISR is kept minimal — it only latches the pending IRQ flag.
+     * Actual SPI servicing happens in radio_service_irqs() in the main loop. */
+    gpio_set_irq_enabled_with_callback(
+        LEOS_SX1262_PIN_DIO1,
+        GPIO_IRQ_EDGE_RISE,
+        true,
+        dio1_irq_handler);
+
+    gpio_set_irq_enabled_with_callback(
+        LEOS_SX1268_PIN_DIO1,
+        GPIO_IRQ_EDGE_RISE,
+        true,
+        dio1_irq_handler);
 
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);

@@ -10,12 +10,10 @@
 
 #define RADIO_MSG_SENSOR_GPS 0x01
 #define RADIO_MSG_EFM 0x02
-#define RADIO_MSG_COMMAND 0x03 //cutdown
-
+#define RADIO_MSG_COMMAND 0x03 // cutdown
 
 #define RADIO_MAX_PAYLOAD_SIZE 128 // unsure about this num
-#define RADIO_MAX_COMMAND_ARGS 16 // unsure about this num
-
+#define RADIO_MAX_COMMAND_ARGS 16  // unsure about this num
 
 typedef struct
 {
@@ -81,17 +79,23 @@ typedef struct
     gps_radio_frame_t gps_data;
 } sensor_gps_radio_frame_t;
 
-typedef struct {
+typedef struct
+{
     uint32_t board_ms;
     int16_t raw[4];
     float volts[4];
 } efm_radio_frame_t;
 
-//typedef struct {
-// cutdown placeholder for now
-//} command_radio_frame_t;
+// typedef struct {
+//  cutdown placeholder for now
+// } command_radio_frame_t;
 
-
+typedef struct
+{
+    uint8_t command_id;
+    uint8_t command_arg_len;
+    uint8_t command_args[RADIO_MAX_COMMAND_ARGS];
+} command_radio_frame_t;
 
 size_t radio_protocol_pack_sensor_gps_frame(
     const sensor_gps_radio_frame_t *frame,
@@ -111,6 +115,5 @@ bool radio_protocol_unpack_command_frame(
 uint16_t radio_protocol_crc16_ccitt(
     const uint8_t *buf,
     size_t len);
-
 
 #endif

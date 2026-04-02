@@ -38,6 +38,7 @@ project(template-pico-module C CXX ASM)
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
+set(LEOS_SX126X_PORT pico CACHE STRING "Platform port for leos_sx126x" FORCE)
 include(leos-sdk)
 
 

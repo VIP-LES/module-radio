@@ -78,3 +78,5 @@ extern leos_mcp251xfd_config_t can_config;
 
 void config_build_sx1262(leos_radio_config_t *cfg);
 void config_build_sx1268(leos_radio_config_t *cfg);
+void config_build_sx1262_hw(leos_radio_hw_config_t *cfg);
+void config_build_sx1268_hw(leos_radio_hw_config_t *cfg);

@@ -6,20 +6,24 @@
 
 int radio_init(void)
 {
+    leos_radio_hw_config_t sx1262_hw_cfg;
+    leos_radio_hw_config_t sx1268_hw_cfg;
     leos_radio_config_t sx1262_cfg;
     leos_radio_config_t sx1268_cfg;
 
+    config_build_sx1262_hw(&sx1262_hw_cfg);
+    config_build_sx1268_hw(&sx1268_hw_cfg);
     config_build_sx1262(&sx1262_cfg);
     config_build_sx1268(&sx1268_cfg);
 
-    int r1 = leos_sx126x_init(LEOS_RADIO_SX1262, &sx1262_cfg);
+    int r1 = leos_sx126x_init(LEOS_RADIO_SX1262, &sx1262_hw_cfg, &sx1262_cfg);
     if (r1 != 0)
     {
         LOG_ERROR("SX1262 init failed");
         return -1;
     }
 
-    int r2 = leos_sx126x_init(LEOS_RADIO_SX1268, &sx1268_cfg);
+    int r2 = leos_sx126x_init(LEOS_RADIO_SX1268, &sx1268_hw_cfg, &sx1268_cfg);
     if (r2 != 0)
     {
         LOG_ERROR("SX1268 init failed");

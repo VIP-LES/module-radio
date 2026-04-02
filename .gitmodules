@@ -2,3 +2,6 @@
 	path = external/leos-sdk
 	url = https://github.com/VIP-LES/leos-sdk
 	branch = master
+[submodule "external/leos-cyphal-types"]
+	path = external/leos-cyphal-types
+	url = https://github.com/VIP-LES/leos-cyphal-types.git

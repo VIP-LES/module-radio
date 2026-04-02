@@ -7,6 +7,7 @@
 #include "leos/cyphal/node.h"
 #include "leos/log.h"
 #include "leos/sx126x.h"
+#include "pico/time.h"
 #include "radio.h"
 #include "radio_protocol.h"
 
@@ -27,21 +28,37 @@ bool cyphal_bridge_sensor_gps_to_radio_frame(
     }
 
     memset(out_frame, 0, sizeof(*out_frame));
+    out_frame->t_pkt_us = (uint64_t)to_us_since_boot(get_absolute_time());
 
-    /*
-     * TODO: Replace the body of this function once the consolidated
-     * sensor + GPS DSDL type is finalized. Map each DSDL field to the
-     * corresponding RF struct field. Document any unit conversion or
-     * width reduction next to the RF struct definition in
-     * radio_protocol.h.
-     *
-     * Example (placeholder until DSDL is ready):
-     *
-     *   out_frame->t_pkt_us         = msg->t_pkt.microsecond;
-     *   out_frame->bme688.humidity  = msg->bme688.humidity;
-     *   out_frame->bme688_valid     = msg->bme688.valid;
-     *   ...
-     */
+    out_frame->bme688.humidity = msg->bme688.humidity;
+    out_frame->bme688.pressure = msg->bme688.pressure.pascal;
+    out_frame->bme688.temperature = msg->bme688.temperature.kelvin;
+    out_frame->bme688.altitude = msg->bme688.altitude.meter;
+    out_frame->bme688.gas_resistance = msg->bme688.gas_resistance;
+    out_frame->bme688_valid = msg->bme688.valid;
+
+    out_frame->tsl2591.light_lux = msg->tsl2591.light_lux;
+    out_frame->tsl2591_valid = msg->tsl2591.valid;
+
+    out_frame->ltr390.uvi = msg->ltr390.uvi;
+    out_frame->ltr390_valid = msg->ltr390.valid;
+
+    out_frame->pmsa003i.pm10_env = msg->pmsa003i.pm10_env;
+    out_frame->pmsa003i.pm25_env = msg->pmsa003i.pm25_env;
+    out_frame->pmsa003i.pm100_env = msg->pmsa003i.pm100_env;
+    out_frame->pmsa003i.aqi_pm25_us = msg->pmsa003i.aqi_pm25_us;
+    out_frame->pmsa003i.aqi_pm100_us = msg->pmsa003i.aqi_pm100_us;
+    out_frame->pmsa003i_valid = msg->pmsa003i.valid;
+
+    out_frame->gps_data.fix_ok = msg->gps_data.fix_ok;
+    out_frame->gps_data.lat = msg->gps_data.lat;
+    out_frame->gps_data.lon = msg->gps_data.lon;
+    out_frame->gps_data.alt_m = msg->gps_data.alt_m;
+    out_frame->gps_data.speed_mps = msg->gps_data.speed_mps;
+    out_frame->gps_data.track_deg = msg->gps_data.track_deg;
+    out_frame->gps_data.sats_used = msg->gps_data.sats_used;
+    out_frame->gps_data.sats_visible = msg->gps_data.sats_visible;
+    out_frame->gps_data.gps_utc_us = msg->gps_data.gps_utc.microsecond;
 
     return true;
 }
@@ -56,18 +73,16 @@ bool cyphal_bridge_efm_to_radio_frame(
     }
 
     memset(out_frame, 0, sizeof(*out_frame));
-
-    /*
-     * TODO: Replace the body of this function once the EFM DSDL type
-     * is finalized. This path runs at ~240 Hz — keep it lean.
-     *
-     * Example (placeholder until DSDL is ready):
-     *
-     *   out_frame->t_pkt_us            = msg->t_pkt.microsecond;
-     *   out_frame->adc1_ch1_diff       = msg->adc1_ch1_diff;
-     *   out_frame->adc2_ch4_breakbeam  = msg->adc2_ch4_breakbeam;
-     *   ...
-     */
+    out_frame->t_pkt_us = (uint64_t)to_us_since_boot(get_absolute_time());
+    out_frame->valid = msg->valid;
+    out_frame->adc1_ch1_diff = msg->adc1_ch1_diff;
+    out_frame->adc1_ch2_sensing = msg->adc1_ch2_sensing;
+    out_frame->adc1_ch3_reference = msg->adc1_ch3_reference;
+    out_frame->adc1_ch4_breakbeam = msg->adc1_ch4_breakbeam;
+    out_frame->adc2_ch1_diff = msg->adc2_ch1_diff;
+    out_frame->adc2_ch2_sensing = msg->adc2_ch2_sensing;
+    out_frame->adc2_ch3_reference = msg->adc2_ch3_reference;
+    out_frame->adc2_ch4_breakbeam = msg->adc2_ch4_breakbeam;
 
     return true;
 }
@@ -115,28 +130,18 @@ void cyphal_bridge_on_sensor_gps(
         return;
     }
 
-    /*
-     * Step 1: Deserialize the incoming transfer into the DSDL struct.
-     *
-     * TODO: Replace this section with the real Nunavut deserialize call
-     * once the generated header is available. The deserializer writes
-     * into msg and returns a byte count or error.
-     *
-     * Example:
-     *
-     *   flight_sensor_gps_dsdl_t msg;
-     *   int32_t result = flight_sensor_gps_dsdl_1_0_deserialize_(
-     *       &msg,
-     *       transfer->payload,
-     *       &transfer->payload_size);
-     *   if (result < 0) {
-     *       LOG_ERROR("sensor_gps deserialize failed: %d", result);
-     *       return;
-     *   }
-     */
     flight_sensor_gps_dsdl_t msg;
     memset(&msg, 0, sizeof(msg));
-    /* TODO: deserialize transfer->payload into msg */
+    size_t payload_size = transfer->payload.size;
+    const int8_t result = leos_aggregate_LowRate_0_1_deserialize_(
+        &msg,
+        (const uint8_t *)transfer->payload.data,
+        &payload_size);
+    if (result < 0)
+    {
+        LOG_ERROR("sensor_gps deserialize failed: %d", (int)result);
+        return;
+    }
 
     /* Step 2: Convert DSDL struct to RF frame. */
     sensor_gps_radio_frame_t rf_frame;
@@ -178,27 +183,18 @@ void cyphal_bridge_on_efm(
         return;
     }
 
-    /*
-     * Step 1: Deserialize the incoming transfer into the DSDL struct.
-     *
-     * TODO: Replace with the real Nunavut deserialize call once the
-     * generated header is available.
-     *
-     * Example:
-     *
-     *   efm_dsdl_t msg;
-     *   int32_t result = efm_dsdl_1_0_deserialize_(
-     *       &msg,
-     *       transfer->payload,
-     *       &transfer->payload_size);
-     *   if (result < 0) {
-     *       LOG_ERROR("efm deserialize failed: %d", result);
-     *       return;
-     *   }
-     */
     efm_dsdl_t msg;
     memset(&msg, 0, sizeof(msg));
-    /* TODO: deserialize transfer->payload into msg */
+    size_t payload_size = transfer->payload.size;
+    const int8_t result = leos_efm_ADC_0_1_deserialize_(
+        &msg,
+        (const uint8_t *)transfer->payload.data,
+        &payload_size);
+    if (result < 0)
+    {
+        LOG_ERROR("efm deserialize failed: %d", (int)result);
+        return;
+    }
 
     /* Step 2: Convert DSDL struct to RF frame. */
     efm_radio_frame_t rf_frame;
@@ -301,8 +297,8 @@ leos_cyphal_result_t cyphal_bridge_publish_sx1262_rx(
      *       serialized_size);
      */
 
-    /* TODO: remove this stub once DSDL publish is implemented */
-    LOG_INFO("command_rx DSDL publish: not yet implemented (DSDL pending)");
+    /* TODO: remove this stub once a command RX DSDL is defined. */
+    LOG_INFO("command_rx DSDL publish: not yet implemented (no command DSDL)");
     (void)dsdl_msg;
 
     return LEOS_CYPHAL_OK;

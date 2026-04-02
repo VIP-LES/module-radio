@@ -23,25 +23,19 @@
 
 #include "canard.h"
 #include "leos/cyphal/node.h"
+#include <leos/aggregate/LowRate_0_1.h>
+#include <leos/efm/ADC_0_1.h>
 #include "radio_protocol.h"
 
 /*
- * TODO: Replace these placeholder types with the real Nunavut-generated
- * types once the DSDL definitions are finalized. All DSDL type knowledge
- * should stay confined to cyphal_bridge.c — only the function signatures
- * below should ever be visible to the rest of the application.
+ * Keep the generated telemetry DSDL types hidden behind local aliases so
+ * the rest of the application only depends on this bridge surface.
+ *
+ * Command RX is still a placeholder because there is not yet a dedicated
+ * DSDL message for a received radio command packet.
  */
-typedef struct
-{
-    /* TODO: fill in consolidated sensor + GPS DSDL fields */
-    uint8_t _placeholder;
-} flight_sensor_gps_dsdl_t;
-
-typedef struct
-{
-    /* TODO: fill in EFM DSDL fields */
-    uint8_t _placeholder;
-} efm_dsdl_t;
+typedef leos_aggregate_LowRate_0_1 flight_sensor_gps_dsdl_t;
+typedef leos_efm_ADC_0_1 efm_dsdl_t;
 
 typedef struct
 {

@@ -9,12 +9,12 @@
 extern leos_mcp251xfd_hw_t can_hw_config;
 extern leos_mcp251xfd_config_t can_config;
 
-/* Cyphal subject IDs */
-#define CYPHAL_SUB_SENSOR_GPS_ID 1
-#define CYPHAL_SUB_SENSOR_GPS_EXTENT 64
+/* Cyphal subject IDs/extents. Keep these aligned with the generated DSDL. */
+#define CYPHAL_SUB_SENSOR_GPS_ID 1500
+#define CYPHAL_SUB_SENSOR_GPS_EXTENT 2048
 
-#define CYPHAL_SUB_EFM_ID 2
-#define CYPHAL_SUB_EFM_EXTENT 64
+#define CYPHAL_SUB_EFM_ID 1400
+#define CYPHAL_SUB_EFM_EXTENT 300
 
 #define CYPHAL_SUB_RADIO_MODE_CMD_ID 3
 #define CYPHAL_SUB_RADIO_MODE_CMD_EXTENT 16

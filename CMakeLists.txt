@@ -55,6 +55,14 @@ pico_set_program_version(RADIO_MODULE_PICO "0.1")
 pico_enable_stdio_uart(RADIO_MODULE_PICO 0)
 pico_enable_stdio_usb(RADIO_MODULE_PICO 1)
 
+# Generate project-specific Cyphal DSDL types from the checked-out LEOS
+# namespace so cyphal_bridge can use real Nunavut structs.
+cyphal_generate_types(
+    TARGET RADIO_MODULE_PICO
+    DSDL_DIR ${PROJECT_SOURCE_DIR}/external/leos-cyphal-types/leos
+    DSDL_LOOKUP_DIRS ${PROJECT_SOURCE_DIR}/external/leos-sdk/external/public_regulated_data_types/uavcan
+)
+
 # Add required template libraries
 target_link_libraries(RADIO_MODULE_PICO
         pico_stdlib
@@ -71,4 +79,3 @@ target_include_directories(RADIO_MODULE_PICO PUBLIC
 )
 
 pico_add_extra_outputs(RADIO_MODULE_PICO)
-

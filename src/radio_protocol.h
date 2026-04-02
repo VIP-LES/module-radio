@@ -15,8 +15,8 @@
 #define RADIO_MAX_PAYLOAD_SIZE 128 // unsure about this num
 #define RADIO_MAX_COMMAND_ARGS 16  // unsure about this num
 
-#define RADIO_SENSOR_GPS_PAYLOAD_SIZE 112U
-#define RADIO_EFM_PAYLOAD_SIZE 28U
+#define RADIO_SENSOR_GPS_PAYLOAD_SIZE 97U
+#define RADIO_EFM_PAYLOAD_SIZE 41U
 
 /*
  * On-wire scalar encoding rules for all RF payloads serialized by
@@ -30,28 +30,29 @@
  *   [sync:1][version:1][message_type:1][sequence:1][payload_len:1]
  *   [payload:payload_len][crc16_ccitt_false:2 little-endian]
  *
- * sensor_gps payload layout (112 bytes total):
+ * sensor_gps payload layout (97 bytes total):
  *   [t_pkt_us:8]
- *   [bme688.board_ms:4][bme688.humidity:4][bme688.pressure:4]
- *   [bme688.temperature:4][bme688.altitude:4][bme688.gas_resistance:4]
- *   [bme688_valid:1]
- *   [tsl2591.board_ms:4][tsl2591.light_lux:4][tsl2591_valid:1]
- *   [ltr390.board_ms:4][ltr390.uvi:2][ltr390_valid:1]
- *   [pmsa003i.board_ms:4][pmsa003i.pm10_env:4][pmsa003i.pm25_env:4]
+ *   [bme688.humidity:4][bme688.pressure:4][bme688.temperature:4]
+ *   [bme688.altitude:4][bme688.gas_resistance:4][bme688_valid:1]
+ *   [tsl2591.light_lux:4][tsl2591_valid:1]
+ *   [ltr390.uvi:2][ltr390_valid:1]
+ *   [pmsa003i.pm10_env:4][pmsa003i.pm25_env:4]
  *   [pmsa003i.pm100_env:4][pmsa003i.aqi_pm25_us:4]
  *   [pmsa003i.aqi_pm100_us:4][pmsa003i_valid:1]
  *   [gps.fix_ok:1][gps.lat:8][gps.lon:8][gps.alt_m:4]
  *   [gps.speed_mps:4][gps.track_deg:4][gps.sats_used:1]
  *   [gps.sats_visible:1][gps.gps_utc_us:8]
  *
- * efm payload layout (28 bytes total):
- *   [board_ms:4]
- *   [raw[0]:2][raw[1]:2][raw[2]:2][raw[3]:2]
- *   [volts[0]:4][volts[1]:4][volts[2]:4][volts[3]:4]
+ * efm payload layout (41 bytes total):
+ *   [t_pkt_us:8]
+ *   [efm_valid:1]
+ *   [adc1_ch1_diff:4][adc1_ch2_sensing:4][adc1_ch3_reference:4]
+ *   [adc1_ch4_breakbeam:4]
+ *   [adc2_ch1_diff:4][adc2_ch2_sensing:4][adc2_ch3_reference:4]
+ *   [adc2_ch4_breakbeam:4]
  */
 typedef struct
 {
-    uint32_t board_ms;
     float humidity;
     float pressure;
     float temperature;
@@ -61,19 +62,16 @@ typedef struct
 
 typedef struct
 {
-    uint32_t board_ms;
     float light_lux;
 } tsl2591_radio_frame_t;
 
 typedef struct
 {
-    uint32_t board_ms;
     uint16_t uvi;
 } ltr390_radio_frame_t;
 
 typedef struct
 {
-    uint32_t board_ms;
     uint32_t pm10_env;
     uint32_t pm25_env;
     uint32_t pm100_env;
@@ -97,27 +95,29 @@ typedef struct
 typedef struct
 {
     uint64_t t_pkt_us;
-
     bme688_radio_frame_t bme688;
     bool bme688_valid;
-
     tsl2591_radio_frame_t tsl2591;
     bool tsl2591_valid;
-
     ltr390_radio_frame_t ltr390;
     bool ltr390_valid;
-
     pmsa003i_radio_frame_t pmsa003i;
     bool pmsa003i_valid;
-
     gps_radio_frame_t gps_data;
 } sensor_gps_radio_frame_t;
 
 typedef struct
 {
-    uint32_t board_ms;
-    int16_t raw[4];
-    float volts[4];
+    uint64_t t_pkt_us;
+    bool valid;
+    float adc1_ch1_diff;
+    float adc1_ch2_sensing;
+    float adc1_ch3_reference;
+    float adc1_ch4_breakbeam;
+    float adc2_ch1_diff;
+    float adc2_ch2_sensing;
+    float adc2_ch3_reference;
+    float adc2_ch4_breakbeam;
 } efm_radio_frame_t;
 
 // typedef struct {

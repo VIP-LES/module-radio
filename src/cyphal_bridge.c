@@ -37,10 +37,9 @@ bool cyphal_bridge_sensor_gps_to_radio_frame(
      *
      * Example (placeholder until DSDL is ready):
      *
-     *   out_frame->t_pkt_us         = msg->timestamp_us;
-     *   out_frame->bme688.board_ms  = msg->bme688.board_ms;
+     *   out_frame->t_pkt_us         = msg->t_pkt.microsecond;
      *   out_frame->bme688.humidity  = msg->bme688.humidity;
-     *   out_frame->bme688_valid     = msg->bme688_valid;
+     *   out_frame->bme688_valid     = msg->bme688.valid;
      *   ...
      */
 
@@ -64,9 +63,9 @@ bool cyphal_bridge_efm_to_radio_frame(
      *
      * Example (placeholder until DSDL is ready):
      *
-     *   out_frame->board_ms  = msg->board_ms;
-     *   out_frame->raw[0]    = msg->channel[0].raw;
-     *   out_frame->volts[0]  = msg->channel[0].volts;
+     *   out_frame->t_pkt_us            = msg->t_pkt.microsecond;
+     *   out_frame->adc1_ch1_diff       = msg->adc1_ch1_diff;
+     *   out_frame->adc2_ch4_breakbeam  = msg->adc2_ch4_breakbeam;
      *   ...
      */
 

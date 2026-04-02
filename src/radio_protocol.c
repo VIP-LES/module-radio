@@ -91,15 +91,6 @@ static bool radio_protocol_write_u64_le(
     return true;
 }
 
-static bool radio_protocol_write_i16_le(
-    int16_t value,
-    uint8_t *buf,
-    size_t buf_size,
-    size_t *offset)
-{
-    return radio_protocol_write_u16_le((uint16_t)value, buf, buf_size, offset);
-}
-
 static bool radio_protocol_write_float_le(
     float value,
     uint8_t *buf,
@@ -134,8 +125,7 @@ static bool radio_protocol_serialize_bme688(
         return false;
     }
 
-    return radio_protocol_write_u32_le(frame->board_ms, payload_buf, payload_buf_size, offset) &&
-           radio_protocol_write_float_le(frame->humidity, payload_buf, payload_buf_size, offset) &&
+    return radio_protocol_write_float_le(frame->humidity, payload_buf, payload_buf_size, offset) &&
            radio_protocol_write_float_le(frame->pressure, payload_buf, payload_buf_size, offset) &&
            radio_protocol_write_float_le(frame->temperature, payload_buf, payload_buf_size, offset) &&
            radio_protocol_write_float_le(frame->altitude, payload_buf, payload_buf_size, offset) &&
@@ -155,8 +145,7 @@ static bool radio_protocol_serialize_tsl2591(
         return false;
     }
 
-    return radio_protocol_write_u32_le(frame->board_ms, payload_buf, payload_buf_size, offset) &&
-           radio_protocol_write_float_le(frame->light_lux, payload_buf, payload_buf_size, offset) &&
+    return radio_protocol_write_float_le(frame->light_lux, payload_buf, payload_buf_size, offset) &&
            radio_protocol_write_bool(valid, payload_buf, payload_buf_size, offset);
 }
 
@@ -172,8 +161,7 @@ static bool radio_protocol_serialize_ltr390(
         return false;
     }
 
-    return radio_protocol_write_u32_le(frame->board_ms, payload_buf, payload_buf_size, offset) &&
-           radio_protocol_write_u16_le(frame->uvi, payload_buf, payload_buf_size, offset) &&
+    return radio_protocol_write_u16_le(frame->uvi, payload_buf, payload_buf_size, offset) &&
            radio_protocol_write_bool(valid, payload_buf, payload_buf_size, offset);
 }
 
@@ -189,8 +177,7 @@ static bool radio_protocol_serialize_pmsa003i(
         return false;
     }
 
-    return radio_protocol_write_u32_le(frame->board_ms, payload_buf, payload_buf_size, offset) &&
-           radio_protocol_write_u32_le(frame->pm10_env, payload_buf, payload_buf_size, offset) &&
+    return radio_protocol_write_u32_le(frame->pm10_env, payload_buf, payload_buf_size, offset) &&
            radio_protocol_write_u32_le(frame->pm25_env, payload_buf, payload_buf_size, offset) &&
            radio_protocol_write_u32_le(frame->pm100_env, payload_buf, payload_buf_size, offset) &&
            radio_protocol_write_u32_le(frame->aqi_pm25_us, payload_buf, payload_buf_size, offset) &&
@@ -286,25 +273,18 @@ static size_t radio_protocol_serialize_efm_payload(
         return 0U;
     }
 
-    if (!radio_protocol_write_u32_le(frame->board_ms, payload_buf, payload_buf_size, &offset))
+    if (!radio_protocol_write_u64_le(frame->t_pkt_us, payload_buf, payload_buf_size, &offset) ||
+        !radio_protocol_write_bool(frame->valid, payload_buf, payload_buf_size, &offset) ||
+        !radio_protocol_write_float_le(frame->adc1_ch1_diff, payload_buf, payload_buf_size, &offset) ||
+        !radio_protocol_write_float_le(frame->adc1_ch2_sensing, payload_buf, payload_buf_size, &offset) ||
+        !radio_protocol_write_float_le(frame->adc1_ch3_reference, payload_buf, payload_buf_size, &offset) ||
+        !radio_protocol_write_float_le(frame->adc1_ch4_breakbeam, payload_buf, payload_buf_size, &offset) ||
+        !radio_protocol_write_float_le(frame->adc2_ch1_diff, payload_buf, payload_buf_size, &offset) ||
+        !radio_protocol_write_float_le(frame->adc2_ch2_sensing, payload_buf, payload_buf_size, &offset) ||
+        !radio_protocol_write_float_le(frame->adc2_ch3_reference, payload_buf, payload_buf_size, &offset) ||
+        !radio_protocol_write_float_le(frame->adc2_ch4_breakbeam, payload_buf, payload_buf_size, &offset))
     {
         return 0U;
-    }
-
-    for (size_t i = 0U; i < 4U; i++)
-    {
-        if (!radio_protocol_write_i16_le(frame->raw[i], payload_buf, payload_buf_size, &offset))
-        {
-            return 0U;
-        }
-    }
-
-    for (size_t i = 0U; i < 4U; i++)
-    {
-        if (!radio_protocol_write_float_le(frame->volts[i], payload_buf, payload_buf_size, &offset))
-        {
-            return 0U;
-        }
     }
 
     if (offset != RADIO_EFM_PAYLOAD_SIZE)

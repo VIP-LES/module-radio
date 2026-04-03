@@ -38,9 +38,12 @@ bool cyphal_bridge_sensor_gps_to_radio_frame(
     out_frame->bme688_valid = msg->bme688.valid;
 
     out_frame->tsl2591.light_lux = msg->tsl2591.light_lux;
+    out_frame->tsl2591.raw_visible = msg->tsl2591.raw_visible;
+    out_frame->tsl2591.raw_infrared = msg->tsl2591.raw_infrared;
+    out_frame->tsl2591.raw_full_spectrum = msg->tsl2591.raw_full_spectrum;
     out_frame->tsl2591_valid = msg->tsl2591.valid;
 
-    out_frame->ltr390.uvi = msg->ltr390.uvi;
+    out_frame->ltr390.uvs = msg->ltr390.uvs;
     out_frame->ltr390_valid = msg->ltr390.valid;
 
     out_frame->pmsa003i.pm10_env = msg->pmsa003i.pm10_env;
@@ -48,6 +51,12 @@ bool cyphal_bridge_sensor_gps_to_radio_frame(
     out_frame->pmsa003i.pm100_env = msg->pmsa003i.pm100_env;
     out_frame->pmsa003i.aqi_pm25_us = msg->pmsa003i.aqi_pm25_us;
     out_frame->pmsa003i.aqi_pm100_us = msg->pmsa003i.aqi_pm100_us;
+    out_frame->pmsa003i.particles_03um = msg->pmsa003i.particles_03um;
+    out_frame->pmsa003i.particles_05um = msg->pmsa003i.particles_05um;
+    out_frame->pmsa003i.particles_10um = msg->pmsa003i.particles_10um;
+    out_frame->pmsa003i.particles_25um = msg->pmsa003i.particles_25um;
+    out_frame->pmsa003i.particles_50um = msg->pmsa003i.particles_50um;
+    out_frame->pmsa003i.particles_100um = msg->pmsa003i.particles_100um;
     out_frame->pmsa003i_valid = msg->pmsa003i.valid;
 
     out_frame->gps_data.fix_ok = msg->gps_data.fix_ok;

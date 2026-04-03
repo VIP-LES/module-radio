@@ -12,10 +12,10 @@
 #define RADIO_MSG_EFM 0x02
 #define RADIO_MSG_COMMAND 0x03 // cutdown
 
-#define RADIO_MAX_PAYLOAD_SIZE 128 // unsure about this num
+#define RADIO_MAX_PAYLOAD_SIZE 131U
 #define RADIO_MAX_COMMAND_ARGS 16  // unsure about this num
 
-#define RADIO_SENSOR_GPS_PAYLOAD_SIZE 97U
+#define RADIO_SENSOR_GPS_PAYLOAD_SIZE 131U
 #define RADIO_EFM_PAYLOAD_SIZE 41U
 
 /*
@@ -30,15 +30,20 @@
  *   [sync:1][version:1][message_type:1][sequence:1][payload_len:1]
  *   [payload:payload_len][crc16_ccitt_false:2 little-endian]
  *
- * sensor_gps payload layout (97 bytes total):
+ * sensor_gps payload layout (131 bytes total):
  *   [t_pkt_us:8]
  *   [bme688.humidity:4][bme688.pressure:4][bme688.temperature:4]
  *   [bme688.altitude:4][bme688.gas_resistance:4][bme688_valid:1]
- *   [tsl2591.light_lux:4][tsl2591_valid:1]
- *   [ltr390.uvi:2][ltr390_valid:1]
+ *   [tsl2591.light_lux:4][tsl2591.raw_visible:2]
+ *   [tsl2591.raw_infrared:2][tsl2591.raw_full_spectrum:4]
+ *   [tsl2591_valid:1]
+ *   [ltr390.uvs:4][ltr390_valid:1]
  *   [pmsa003i.pm10_env:4][pmsa003i.pm25_env:4]
  *   [pmsa003i.pm100_env:4][pmsa003i.aqi_pm25_us:4]
- *   [pmsa003i.aqi_pm100_us:4][pmsa003i_valid:1]
+ *   [pmsa003i.aqi_pm100_us:4][pmsa003i.particles_03um:4]
+ *   [pmsa003i.particles_05um:4][pmsa003i.particles_10um:4]
+ *   [pmsa003i.particles_25um:4][pmsa003i.particles_50um:4]
+ *   [pmsa003i.particles_100um:4][pmsa003i_valid:1]
  *   [gps.fix_ok:1][gps.lat:8][gps.lon:8][gps.alt_m:4]
  *   [gps.speed_mps:4][gps.track_deg:4][gps.sats_used:1]
  *   [gps.sats_visible:1][gps.gps_utc_us:8]
@@ -63,11 +68,14 @@ typedef struct
 typedef struct
 {
     float light_lux;
+    uint16_t raw_visible;
+    uint16_t raw_infrared;
+    uint32_t raw_full_spectrum;
 } tsl2591_radio_frame_t;
 
 typedef struct
 {
-    uint16_t uvi;
+    uint32_t uvs;
 } ltr390_radio_frame_t;
 
 typedef struct
@@ -77,6 +85,12 @@ typedef struct
     uint32_t pm100_env;
     uint32_t aqi_pm25_us;
     uint32_t aqi_pm100_us;
+    uint32_t particles_03um;
+    uint32_t particles_05um;
+    uint32_t particles_10um;
+    uint32_t particles_25um;
+    uint32_t particles_50um;
+    uint32_t particles_100um;
 } pmsa003i_radio_frame_t;
 
 typedef struct

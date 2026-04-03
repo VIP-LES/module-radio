@@ -146,6 +146,9 @@ static bool radio_protocol_serialize_tsl2591(
     }
 
     return radio_protocol_write_float_le(frame->light_lux, payload_buf, payload_buf_size, offset) &&
+           radio_protocol_write_u16_le(frame->raw_visible, payload_buf, payload_buf_size, offset) &&
+           radio_protocol_write_u16_le(frame->raw_infrared, payload_buf, payload_buf_size, offset) &&
+           radio_protocol_write_u32_le(frame->raw_full_spectrum, payload_buf, payload_buf_size, offset) &&
            radio_protocol_write_bool(valid, payload_buf, payload_buf_size, offset);
 }
 
@@ -161,7 +164,7 @@ static bool radio_protocol_serialize_ltr390(
         return false;
     }
 
-    return radio_protocol_write_u16_le(frame->uvi, payload_buf, payload_buf_size, offset) &&
+    return radio_protocol_write_u32_le(frame->uvs, payload_buf, payload_buf_size, offset) &&
            radio_protocol_write_bool(valid, payload_buf, payload_buf_size, offset);
 }
 
@@ -182,6 +185,12 @@ static bool radio_protocol_serialize_pmsa003i(
            radio_protocol_write_u32_le(frame->pm100_env, payload_buf, payload_buf_size, offset) &&
            radio_protocol_write_u32_le(frame->aqi_pm25_us, payload_buf, payload_buf_size, offset) &&
            radio_protocol_write_u32_le(frame->aqi_pm100_us, payload_buf, payload_buf_size, offset) &&
+           radio_protocol_write_u32_le(frame->particles_03um, payload_buf, payload_buf_size, offset) &&
+           radio_protocol_write_u32_le(frame->particles_05um, payload_buf, payload_buf_size, offset) &&
+           radio_protocol_write_u32_le(frame->particles_10um, payload_buf, payload_buf_size, offset) &&
+           radio_protocol_write_u32_le(frame->particles_25um, payload_buf, payload_buf_size, offset) &&
+           radio_protocol_write_u32_le(frame->particles_50um, payload_buf, payload_buf_size, offset) &&
+           radio_protocol_write_u32_le(frame->particles_100um, payload_buf, payload_buf_size, offset) &&
            radio_protocol_write_bool(valid, payload_buf, payload_buf_size, offset);
 }
 

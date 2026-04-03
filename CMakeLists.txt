@@ -28,8 +28,8 @@ set(PICO_BOARD pimoroni_pico_plus2_rp2350 CACHE STRING "Board type")
 # add CMake directory in path
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
-# Pull in Raspberry Pi Pico SDK (must be before project)
-include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
+# Pull in Raspberry Pi Pico SDK
+include(pico_sdk_import)
 
 # ====================================================================================
 

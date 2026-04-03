@@ -43,18 +43,18 @@ extern leos_mcp251xfd_config_t can_config;
  * TODO: verify against board schematic before first hardware test
  * --------------------------------------------------------------------- */
 #define LEOS_SX1262_PIN_NSS 13   /* TODO: set from schematic */
-#define LEOS_SX1262_PIN_BUSY 14  /* TODO: set from schematic */
-#define LEOS_SX1262_PIN_RESET 15 /* TODO: set from schematic */
-#define LEOS_SX1262_PIN_DIO1 16  /* TODO: set from schematic */
+#define LEOS_SX1262_PIN_BUSY 19  /* TODO: set from schematic */
+#define LEOS_SX1262_PIN_RESET 15 /* TODO: set from schematic */ 
+#define LEOS_SX1262_PIN_DIO1 17  /* TODO: set from schematic */
 
 /* -----------------------------------------------------------------------
  * SX1268 per-device GPIO pins
  * TODO: verify against board schematic before first hardware test
  * --------------------------------------------------------------------- */
-#define LEOS_SX1268_PIN_NSS 17   /* TODO: set from schematic */
+#define LEOS_SX1268_PIN_NSS 14   /* TODO: set from schematic */ 
 #define LEOS_SX1268_PIN_BUSY 18  /* TODO: set from schematic */
-#define LEOS_SX1268_PIN_RESET 19 /* TODO: set from schematic */
-#define LEOS_SX1268_PIN_DIO1 20  /* TODO: set from schematic */
+#define LEOS_SX1268_PIN_RESET 15 /* TODO: set from schematic */
+#define LEOS_SX1268_PIN_DIO1 16  /* TODO: set from schematic */
 
 /* SX1262 LoRa config */
 #define SX1262_RF_FREQUENCY_HZ 915000000UL /* TODO: confirm frequency */

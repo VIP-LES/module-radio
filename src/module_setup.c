@@ -22,11 +22,17 @@ static void dio1_irq_handler(uint gpio, uint32_t events)
 
     if (gpio == LEOS_SX1262_PIN_DIO1)
     {
-        radio_handle_dio1_irq_sx1262();
+        if (radio_is_sx1262_enabled())
+        {
+            radio_handle_dio1_irq_sx1262();
+        }
     }
     else if (gpio == LEOS_SX1268_PIN_DIO1)
     {
-        radio_handle_dio1_irq_sx1268();
+        if (radio_is_sx1268_enabled())
+        {
+            radio_handle_dio1_irq_sx1268();
+        }
     }
 }
 
@@ -67,13 +73,13 @@ int module_setup_init(MCP251XFD *dev, leos_cyphal_node_t *node)
     gpio_set_irq_enabled_with_callback(
         LEOS_SX1262_PIN_DIO1,
         GPIO_IRQ_EDGE_RISE,
-        true,
+        radio_is_sx1262_enabled(),
         dio1_irq_handler);
 
     gpio_set_irq_enabled_with_callback(
         LEOS_SX1268_PIN_DIO1,
         GPIO_IRQ_EDGE_RISE,
-        true,
+        radio_is_sx1268_enabled(),
         dio1_irq_handler);
 
     gpio_init(PICO_DEFAULT_LED_PIN);

@@ -5,7 +5,14 @@
 #include <stdbool.h>
 #include "leos/sx126x.h"
 
+typedef struct
+{
+    bool sx1262_enabled;
+    bool sx1268_enabled;
+} radio_init_options_t;
+
 int radio_init(void);
+int radio_init_with_options(const radio_init_options_t *options);
 
 void radio_service_irqs(void);
 
@@ -24,3 +31,6 @@ int radio_read_sx1262(
     leos_radio_packet_info_t *info);
 
 int radio_enter_command_rx_mode(void);
+
+bool radio_is_sx1262_enabled(void);
+bool radio_is_sx1268_enabled(void);

@@ -4,6 +4,7 @@
 #include "cyphal_bridge.h"
 #include "module_setup.h"
 #include "radio.h"
+#include "tethered_test.h"
 
 #include "canard.h"
 #include "leos/cyphal/node.h"
@@ -13,6 +14,31 @@ int main(void)
 {
     stdio_init_all();
 
+#if !defined(LEOS_FAKE_TELEMETRY_MODE)
+#define LEOS_FAKE_TELEMETRY_MODE 0
+#endif
+
+#if !defined(LEOS_ENABLE_SX1268)
+#define LEOS_ENABLE_SX1268 1
+#endif
+
+#if LEOS_FAKE_TELEMETRY_MODE
+    const radio_init_options_t radio_options = {
+        .sx1262_enabled = true,
+        .sx1268_enabled = false,
+    };
+
+    const int rc = radio_init_with_options(&radio_options);
+    if (rc != 0)
+    {
+        while (true)
+        {
+            tight_loop_contents();
+        }
+    }
+
+    tethered_test_init();
+#else
     MCP251XFD dev;
     leos_cyphal_node_t node;
 
@@ -46,6 +72,7 @@ int main(void)
         /* LOG_ERROR("Failed to subscribe sensor_gps: %d", sub_rc); */
     }
 
+#if LEOS_ENABLE_SX1268
     sub_rc = leos_cyphal_subscribe(
         &node,
         CanardTransferKindMessage,
@@ -58,10 +85,16 @@ int main(void)
     {
         /* LOG_ERROR("Failed to subscribe efm: %d", sub_rc); */
     }
+#endif
+#endif
 
     /* Main loop — keep this simple and fast. */
     while (true)
     {
+#if LEOS_FAKE_TELEMETRY_MODE
+        radio_service_irqs();
+        tethered_test_service();
+#else
         leos_mcp251xfd_task(&dev);
         leos_cyphal_task(&node);
         radio_service_irqs();
@@ -70,6 +103,7 @@ int main(void)
         {
             cyphal_bridge_publish_sx1262_rx(&node);
         }
+#endif
 
         tight_loop_contents();
     }

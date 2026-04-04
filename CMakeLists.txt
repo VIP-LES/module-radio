@@ -35,6 +35,14 @@ include(pico_sdk_import)
 
 project(template-pico-module C CXX ASM)
 
+option(LEOS_FAKE_TELEMETRY_MODE "Transmit fake sensor/gps telemetry over SX1262 without Cyphal/CAN" OFF)
+option(LEOS_ENABLE_SX1262 "Enable the SX1262 radio" ON)
+option(LEOS_ENABLE_SX1268 "Enable the SX1268 radio" ON)
+
+if(DEFINED LEOS_TETHERED_TEST_MODE)
+    set(LEOS_FAKE_TELEMETRY_MODE ${LEOS_TETHERED_TEST_MODE} CACHE BOOL "Backward-compatible alias for LEOS_FAKE_TELEMETRY_MODE" FORCE)
+endif()
+
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
@@ -72,6 +80,13 @@ target_link_libraries(RADIO_MODULE_PICO
         leos_cyphal_transport_mcp251xfd
         leos_cyphal_node
         leos_sx126x
+)
+
+target_compile_definitions(RADIO_MODULE_PICO PRIVATE
+    LEOS_FAKE_TELEMETRY_MODE=$<BOOL:${LEOS_FAKE_TELEMETRY_MODE}>
+    LEOS_TETHERED_TEST_MODE=$<BOOL:${LEOS_FAKE_TELEMETRY_MODE}>
+    LEOS_ENABLE_SX1262=$<BOOL:${LEOS_ENABLE_SX1262}>
+    LEOS_ENABLE_SX1268=$<BOOL:${LEOS_ENABLE_SX1268}>
 )
 
 # Add the standard include files to the build

@@ -1,3 +1,34 @@
+# Module Radio Firmware
+
+## Local Telemetry Test Workflow
+
+This branch supports two independent build-time controls:
+
+- `LEOS_FAKE_TELEMETRY_MODE=ON`: bypass CAN/Cyphal entirely and transmit fake
+  `sensor_gps` RF frames directly over the SX1262 once per second.
+- `LEOS_ENABLE_SX1268=OFF`: do not initialize or use the SX1268. This is the
+  right setting both for the preliminary local telemetry test and for later
+  real-sensor integration runs that still use only the SX1262 path.
+
+Recommended builds:
+
+```bash
+cmake -S . -B build \
+  -DLEOS_FAKE_TELEMETRY_MODE=ON \
+  -DLEOS_ENABLE_SX1268=OFF
+cmake --build build
+```
+
+For the next phase, where real sensor/Cyphal traffic should feed the SX1262 but
+the SX1268/EFM path should remain disabled:
+
+```bash
+cmake -S . -B build \
+  -DLEOS_FAKE_TELEMETRY_MODE=OFF \
+  -DLEOS_ENABLE_SX1268=OFF
+cmake --build build
+```
+
 # Raspberry Pi Pico Module Template
 
 A starting point for all Pico family software development on our module-based PCB. This template provides a foundation for developing embedded applications that will eventually include OpenCyphal communication capabilities for interoperability with other systems.

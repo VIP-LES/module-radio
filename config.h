@@ -1,0 +1,16 @@
+#pragma once
+
+#define RADIO_SPI spi1
+#define RADIO_SCK 10
+#define RADIO_MOSI 11
+#define RADIO_MISO 12
+#define RADIO_CS 13
+#define RADIO_RESET 15
+#define RADIO_BUSY 19
+#define RADIO_DIO1 17
+
+#define UNUSED_RADIO_CS 14
+
+#define RADIO_TEST_FREQ_HZ 915000000u
+#define RADIO_TEST_CHIP_POWER_DBM (-9)
+#define RADIO_TCXO_VOLTAGE SX126X_TCXO_CTRL_2_2V

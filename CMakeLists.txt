@@ -59,3 +59,12 @@ target_link_libraries(pico_sx1262_tx_test PRIVATE
 pico_enable_stdio_uart(pico_sx1262_tx_test 0)
 pico_enable_stdio_usb(pico_sx1262_tx_test 1)
 pico_add_extra_outputs(pico_sx1262_tx_test)
+
+add_executable(pico_sx1262_rx_test rx_test.c sx126x_hal_pico.c)
+pico_set_program_name(pico_sx1262_rx_test "pico_sx1262_rx_test")
+pico_set_program_version(pico_sx1262_rx_test "0.1")
+target_link_libraries(pico_sx1262_rx_test PRIVATE
+    pico_stdlib hardware_spi sx126x_driver::sx126x_driver)
+pico_enable_stdio_uart(pico_sx1262_rx_test 0)
+pico_enable_stdio_usb(pico_sx1262_rx_test 1)
+pico_add_extra_outputs(pico_sx1262_rx_test)

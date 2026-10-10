@@ -113,7 +113,7 @@ int main(void)
     while (true) {
         printf("TX test: %lu Hz, chip power %d dBm, SF7, BW125, CR4/5, sync 0x12, CRC on.\n",
             (unsigned long)RADIO_TEST_FREQ_HZ, RADIO_TEST_CHIP_POWER_DBM);
-        puts("Hold RXEN at GND and attach antenna/load. Enter t for ONE packet.");
+        puts("Attach antenna/load. Enter t for ONE packet.");
         int ch = getchar_timeout_us(2000000);
         if (ch != 't') continue;
         if (!send_packet()) {

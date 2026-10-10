@@ -42,15 +42,6 @@ set(SX126X_DRIVER_PATH "${CMAKE_CURRENT_LIST_DIR}/../sx126x_driver"
     CACHE PATH "Unmodified Semtech sx126x_driver checkout")
 add_subdirectory("${SX126X_DRIVER_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/sx126x_driver")
 
-add_executable(pico_sx1262_minimal main.c sx126x_hal_pico.c)
-pico_set_program_name(pico_sx1262_minimal "pico_sx1262_minimal")
-pico_set_program_version(pico_sx1262_minimal "0.1")
-target_link_libraries(pico_sx1262_minimal PRIVATE
-    pico_stdlib hardware_spi sx126x_driver::sx126x_driver)
-pico_enable_stdio_uart(pico_sx1262_minimal 0)
-pico_enable_stdio_usb(pico_sx1262_minimal 1)
-pico_add_extra_outputs(pico_sx1262_minimal)
-
 add_executable(pico_sx1262_tx_test tx_test.c sx126x_hal_pico.c)
 pico_set_program_name(pico_sx1262_tx_test "pico_sx1262_tx_test")
 pico_set_program_version(pico_sx1262_tx_test "0.1")

@@ -42,6 +42,25 @@ set(SX126X_DRIVER_PATH "${CMAKE_CURRENT_LIST_DIR}/../sx126x_driver"
     CACHE PATH "Unmodified Semtech sx126x_driver checkout")
 add_subdirectory("${SX126X_DRIVER_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/sx126x_driver")
 
+set(LEOS_PROTOBUF_PATH "${CMAKE_CURRENT_LIST_DIR}/../leos-protobufs"
+    CACHE PATH "LEOS protobuf schema and generated nanopb codec checkout")
+set(LEOS_PROTOBUF_GENERATED "${LEOS_PROTOBUF_PATH}/generated/c")
+set(NANOPB_PATH "${LEOS_PROTOBUF_PATH}/vendor/nanopb")
+
+add_library(leos_protobuf_codec STATIC
+    ${NANOPB_PATH}/pb_common.c
+    ${NANOPB_PATH}/pb_encode.c
+    ${LEOS_PROTOBUF_GENERATED}/beacon.pb.c
+    ${LEOS_PROTOBUF_GENERATED}/command.pb.c
+    ${LEOS_PROTOBUF_GENERATED}/efm.pb.c
+    ${LEOS_PROTOBUF_GENERATED}/gps.pb.c
+    ${LEOS_PROTOBUF_GENERATED}/packet.pb.c
+    ${LEOS_PROTOBUF_GENERATED}/purpleboard.pb.c
+    ${LEOS_PROTOBUF_GENERATED}/telemetry.pb.c)
+target_include_directories(leos_protobuf_codec PUBLIC
+    ${NANOPB_PATH}
+    ${LEOS_PROTOBUF_GENERATED})
+
 add_executable(pico_sx1262_tx_test tx_test.c sx126x_hal_pico.c)
 pico_set_program_name(pico_sx1262_tx_test "pico_sx1262_tx_test")
 pico_set_program_version(pico_sx1262_tx_test "0.1")
@@ -50,6 +69,16 @@ target_link_libraries(pico_sx1262_tx_test PRIVATE
 pico_enable_stdio_uart(pico_sx1262_tx_test 0)
 pico_enable_stdio_usb(pico_sx1262_tx_test 1)
 pico_add_extra_outputs(pico_sx1262_tx_test)
+
+add_executable(pico_sx1262_tx_protobuf_test
+    tx_protobuf_test.c sx126x_hal_pico.c)
+pico_set_program_name(pico_sx1262_tx_protobuf_test "pico_sx1262_tx_protobuf_test")
+pico_set_program_version(pico_sx1262_tx_protobuf_test "0.1")
+target_link_libraries(pico_sx1262_tx_protobuf_test PRIVATE
+    pico_stdlib hardware_spi sx126x_driver::sx126x_driver leos_protobuf_codec)
+pico_enable_stdio_uart(pico_sx1262_tx_protobuf_test 0)
+pico_enable_stdio_usb(pico_sx1262_tx_protobuf_test 1)
+pico_add_extra_outputs(pico_sx1262_tx_protobuf_test)
 
 add_executable(pico_sx1262_rx_test rx_test.c sx126x_hal_pico.c)
 pico_set_program_name(pico_sx1262_rx_test "pico_sx1262_rx_test")

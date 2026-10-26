@@ -13,6 +13,10 @@ _Static_assert(leos_Packet_size <= 255, "Protobuf exceeds SX1262 packet limit");
 _Static_assert(RADIO_TEST_FREQ_HZ >= 902000000u && RADIO_TEST_FREQ_HZ <= 928000000u,
     "Update image calibration before selecting another band");
 
+// Stream mode (type 's'): send packets back to back until any key is pressed.
+#define STREAM_INTERVAL_MS 1000   // start-to-start time between packets (a packet takes ~250 ms, so 250 is about the fastest)
+#define STREAM_MAX_PACKETS 0      // 0 = run until a key is pressed, otherwise stop after this many packets
+
 #define CHECK(call) do { \
     if ((call) != SX126X_STATUS_OK) { \
         printf("FAIL: %s\n", #call); \
@@ -28,36 +32,56 @@ static const sx126x_mod_params_lora_t modulation = {
     .cr = SX126X_LORA_CR_4_5, .ldro = 0,
 };
 
-static bool encode_test_packet(uint8_t *buffer, size_t capacity, size_t *encoded_size)
+// Small xorshift32 generator (no extra libraries to link). Seeded from the clock in main().
+static uint32_t rng_state = 2463534242u;
+
+static uint32_t rand_u32(void)
+{
+    rng_state ^= rng_state << 13;
+    rng_state ^= rng_state >> 17;
+    rng_state ^= rng_state << 5;
+    return rng_state;
+}
+
+// Uniform random float in [lo, hi].
+static float rand_range(float lo, float hi)
+{
+    return lo + (hi - lo) * ((float)(rand_u32() >> 8) / 16777215.0f);
+}
+
+// vary=false gives the fixed reference packet (sequence 42 values, used by the 't' check).
+// vary=true fills every reading with a random value in a realistic range.
+static bool encode_packet(uint8_t *buffer, size_t capacity, size_t *encoded_size,
+                          uint32_t sequence, uint64_t timestamp_ms, bool vary)
 {
     leos_Packet message = leos_Packet_init_zero;
     strcpy(message.callsign, "LEOS-TEST");
-    message.sequence = 42;
-    message.timestamp_ms = 123456;
+    message.sequence = sequence;
+    message.timestamp_ms = timestamp_ms;
     message.which_payload = leos_Packet_telemetry_tag;
     message.payload.telemetry.which_data = leos_TelemetryPacket_low_rate_tag;
 
     leos_LowRateTelemetry *low = &message.payload.telemetry.data.low_rate;
     low->has_sensors = true;
     low->sensors = (leos_PurpleboardTelemetry){
-        .temperature = 20.5f,
-        .pressure = 101325.0f,
-        .humidity = 45.5f,
-        .uvi = 3,
-        .light_lux = 128.0f,
-        .gas_resistance = 10000.0f,
+        .temperature = vary ? rand_range(15.0f, 25.0f) : 20.5f,
+        .pressure = vary ? rand_range(95000.0f, 102000.0f) : 101325.0f,
+        .humidity = vary ? rand_range(30.0f, 60.0f) : 45.5f,
+        .uvi = vary ? (rand_u32() % 12) : 3,
+        .light_lux = vary ? rand_range(0.0f, 1000.0f) : 128.0f,
+        .gas_resistance = vary ? rand_range(5000.0f, 20000.0f) : 10000.0f,
     };
     low->has_beacon = true;
     low->beacon.has_gps = true;
     low->beacon.gps = (leos_GPS){
-        .lat = 33.75,
-        .lon = -84.5,
-        .alt_m = 300.0f,
-        .satellites = 8,
+        .lat = vary ? 33.70 + (double)rand_range(0.0f, 0.10f) : 33.75,
+        .lon = vary ? -84.55 + (double)rand_range(0.0f, 0.10f) : -84.5,
+        .alt_m = vary ? rand_range(0.0f, 30000.0f) : 300.0f,
+        .satellites = vary ? (4 + rand_u32() % 9) : 8,
         .fix = 3,
-        .climb_mps = 1.5f,
-        .hdop = 0.75f,
-        .utc_unix_ms = 1789992000000ULL,
+        .climb_mps = vary ? rand_range(-5.0f, 5.0f) : 1.5f,
+        .hdop = vary ? rand_range(0.5f, 2.0f) : 0.75f,
+        .utc_unix_ms = 1789992000000ULL + (vary ? (uint64_t)sequence * 1000ULL : 0ULL),
     };
     low->beacon.has_health = true;
     low->beacon.health = (leos_Health){
@@ -176,12 +200,49 @@ static bool send_packet(const uint8_t *payload, size_t payload_size)
     return false;
 }
 
+// Send packets with increasing sequence numbers until a key is pressed (or STREAM_MAX_PACKETS is reached).
+// The sequence counts every attempt, so gaps seen at the receiver are packets that were lost over the air.
+static void run_stream(uint8_t *payload, size_t capacity)
+{
+    uint32_t sent = 0;
+    uint32_t failed = 0;
+    const absolute_time_t t0 = get_absolute_time();
+
+    printf("STREAM START: one packet every %u ms, send any key to stop\n", (unsigned)STREAM_INTERVAL_MS);
+    while (getchar_timeout_us(0) == PICO_ERROR_TIMEOUT) {
+        const absolute_time_t next = make_timeout_time_ms(STREAM_INTERVAL_MS);
+        const uint32_t sequence = sent + failed + 1;
+        size_t size = 0;
+
+        if (encode_packet(payload, capacity, &size, sequence,
+                to_ms_since_boot(get_absolute_time()), true) && send_packet(payload, size)) {
+            sent++;
+            printf("STREAM seq=%lu bytes=%u ok (sent %lu, failed %lu)\n",
+                (unsigned long)sequence, (unsigned)size, (unsigned long)sent, (unsigned long)failed);
+        } else {
+            failed++;
+            printf("STREAM seq=%lu FAILED (sent %lu, failed %lu)\n",
+                (unsigned long)sequence, (unsigned long)sent, (unsigned long)failed);
+            if (sx126x_reset(&radio) != SX126X_STATUS_OK)
+                puts("FAIL: reset failed; disconnect power");
+        }
+
+#if STREAM_MAX_PACKETS > 0
+        if ((sent + failed) >= STREAM_MAX_PACKETS) break;
+#endif
+        sleep_until(next);  // returns at once if the packet took longer than the interval
+    }
+    printf("STREAM END: sent=%lu failed=%lu in %lld ms\n", (unsigned long)sent, (unsigned long)failed,
+        (long long)(absolute_time_diff_us(t0, get_absolute_time()) / 1000));
+}
+
 int main(void)
 {
     uint8_t payload[leos_Packet_size];
     size_t payload_size = 0;
 
     stdio_init_all();
+    rng_state = time_us_32() | 1u;  // never zero
     gpio_init(UNUSED_RADIO_CS);
     gpio_put(UNUSED_RADIO_CS, 1);
     gpio_set_dir(UNUSED_RADIO_CS, GPIO_OUT);
@@ -192,10 +253,16 @@ int main(void)
     while (true) {
         printf("Protobuf TX test: %lu Hz, chip power %d dBm, SF7, BW125, CR4/5, sync 0x12, CRC on.\n",
             (unsigned long)RADIO_TEST_FREQ_HZ, RADIO_TEST_CHIP_POWER_DBM);
-        puts("Attach antenna/load. Enter t to encode and send ONE packet.");
+        puts("Attach antenna/load. Enter t to send ONE packet, s to stream packets until a key is pressed.");
         int ch = getchar_timeout_us(2000000);
+        if (ch == 's') {
+            run_stream(payload, sizeof payload);
+            sleep_ms(1000);
+            while (getchar_timeout_us(0) != PICO_ERROR_TIMEOUT) {}
+            continue;
+        }
         if (ch != 't') continue;
-        if (encode_test_packet(payload, sizeof payload, &payload_size) &&
+        if (encode_packet(payload, sizeof payload, &payload_size, 42, 123456, false) &&
             check_reference_payload(payload, payload_size)) {
             printf("ENCODED: callsign LEOS-TEST, sequence 42, %u bytes\n",
                 (unsigned)payload_size);

@@ -13,8 +13,11 @@ _Static_assert(leos_Packet_size <= 255, "Protobuf exceeds SX1262 packet limit");
 _Static_assert(RADIO_TEST_FREQ_HZ >= 902000000u && RADIO_TEST_FREQ_HZ <= 928000000u,
     "Update image calibration before selecting another band");
 
-// Stream mode (type 's'): send packets back to back until any key is pressed.
-#define STREAM_INTERVAL_MS 1000   // start-to-start time between packets (a packet takes ~250 ms, so 250 is about the fastest)
+// Stream mode: type s, m, f or x to send packets until any key is pressed.
+//   s = one packet every 1000 ms     m = every 500 ms     f = every 250 ms     x = no wait (as fast as the radio allows)
+#define STREAM_INTERVAL_SLOW_MS 1000
+#define STREAM_INTERVAL_MEDIUM_MS 500
+#define STREAM_INTERVAL_FAST_MS 250
 #define STREAM_MAX_PACKETS 0      // 0 = run until a key is pressed, otherwise stop after this many packets
 
 #define CHECK(call) do { \
@@ -28,9 +31,20 @@ static const sx126x_pico_t radio = {
     .spi = RADIO_SPI, .cs = RADIO_CS, .reset = RADIO_RESET, .busy = RADIO_BUSY,
 };
 static const sx126x_mod_params_lora_t modulation = {
-    .sf = SX126X_LORA_SF7, .bw = SX126X_LORA_BW_125,
+    .sf = SX126X_LORA_SF7, .bw = SX126X_LORA_BW_500,
     .cr = SX126X_LORA_CR_4_5, .ldro = 0,
 };
+
+// Bandwidth in kHz, for the startup message (so the text always matches the real setting).
+static unsigned modulation_bw_khz(void)
+{
+    switch (modulation.bw) {
+        case SX126X_LORA_BW_500: return 500;
+        case SX126X_LORA_BW_250: return 250;
+        case SX126X_LORA_BW_125: return 125;
+        default: return 0;
+    }
+}
 
 // Small xorshift32 generator (no extra libraries to link). Seeded from the clock in main().
 static uint32_t rng_state = 2463534242u;
@@ -136,19 +150,16 @@ static bool check_errors(void)
     return true;
 }
 
-static bool send_packet(const uint8_t *payload, size_t payload_size)
+static bool radio_ready = false;
+
+// Everything that stays the same from packet to packet. Runs once at startup, and again after any failure.
+static bool radio_init(void)
 {
     const sx126x_pa_cfg_params_t pa = {
         .pa_duty_cycle = 0x04, .hp_max = 0x07, .device_sel = 0, .pa_lut = 1,
     };
-    const sx126x_pkt_params_lora_t packet = {
-        .preamble_len_in_symb = 8,
-        .header_type = SX126X_LORA_PKT_EXPLICIT,
-        .pld_len_in_bytes = (uint8_t)payload_size,
-        .crc_is_on = true,
-        .invert_iq_is_on = false,
-    };
 
+    radio_ready = false;
     CHECK(sx126x_reset(&radio));
     CHECK(sx126x_wakeup(&radio));
     CHECK(sx126x_set_standby(&radio, SX126X_STANDBY_CFG_RC));
@@ -163,19 +174,36 @@ static bool send_packet(const uint8_t *payload, size_t payload_size)
     CHECK(sx126x_set_pa_cfg(&radio, &pa));
     CHECK(sx126x_set_tx_params(&radio, RADIO_TEST_CHIP_POWER_DBM, SX126X_RAMP_200_US));
     CHECK(sx126x_set_lora_mod_params(&radio, &modulation));
-    CHECK(sx126x_set_lora_pkt_params(&radio, &packet));
     CHECK(sx126x_set_lora_sync_word(&radio, 0x12));
     CHECK(sx126x_set_buffer_base_address(&radio, 0, 0));
-    CHECK(sx126x_write_buffer(&radio, 0, payload, (uint8_t)payload_size));
     CHECK(sx126x_set_rx_tx_fallback_mode(&radio, SX126X_FALLBACK_STDBY_RC));
     CHECK(sx126x_set_dio_irq_params(&radio,
         SX126X_IRQ_TX_DONE | SX126X_IRQ_TIMEOUT, 0, 0, 0));
     CHECK(sx126x_clear_irq_status(&radio, SX126X_IRQ_ALL));
     if (!check_errors()) return false;
+    radio_ready = true;
+    return true;
+}
 
-    printf("TX: %u protobuf bytes, estimated airtime %lu ms\n",
-        (unsigned)payload_size,
-        (unsigned long)sx126x_get_lora_time_on_air_in_ms(&packet, &modulation));
+// The per-packet part: only what changes between packets.
+static bool transmit_packet(const uint8_t *payload, size_t payload_size, bool verbose)
+{
+    const sx126x_pkt_params_lora_t packet = {
+        .preamble_len_in_symb = 8,
+        .header_type = SX126X_LORA_PKT_EXPLICIT,
+        .pld_len_in_bytes = (uint8_t)payload_size,
+        .crc_is_on = true,
+        .invert_iq_is_on = false,
+    };
+
+    CHECK(sx126x_set_lora_pkt_params(&radio, &packet));  // the payload length changes from packet to packet
+    CHECK(sx126x_write_buffer(&radio, 0, payload, (uint8_t)payload_size));
+    CHECK(sx126x_clear_irq_status(&radio, SX126X_IRQ_ALL));
+
+    if (verbose)
+        printf("TX: %u protobuf bytes, estimated airtime %lu ms\n",
+            (unsigned)payload_size,
+            (unsigned long)sx126x_get_lora_time_on_air_in_ms(&packet, &modulation));
     const absolute_time_t start = get_absolute_time();
     CHECK(sx126x_set_tx(&radio, 1000));
     const absolute_time_t deadline = make_timeout_time_ms(1500);
@@ -190,41 +218,55 @@ static bool send_packet(const uint8_t *payload, size_t payload_size)
             CHECK(sx126x_clear_irq_status(&radio, SX126X_IRQ_ALL));
             CHECK(sx126x_set_standby(&radio, SX126X_STANDBY_CFG_RC));
             if (!check_errors()) return false;
-            printf("TX_DONE: elapsed %lld us; receiver confirmation required\n",
-                (long long)absolute_time_diff_us(start, get_absolute_time()));
+            if (verbose)
+                printf("TX_DONE: elapsed %lld us; receiver confirmation required\n",
+                    (long long)absolute_time_diff_us(start, get_absolute_time()));
             return true;
         }
-        sleep_ms(2);
+        sleep_us(250);
     }
     puts("FAIL: host TX deadline expired");
     return false;
 }
 
+// Sends one packet. Sets the radio up first if it is not ready, and after any failure marks it
+// not ready so the whole configuration is rebuilt before the next packet.
+static bool send_packet(const uint8_t *payload, size_t payload_size, bool verbose)
+{
+    if (!radio_ready && !radio_init()) return false;
+    if (transmit_packet(payload, payload_size, verbose)) return true;
+    radio_ready = false;
+    return false;
+}
+
 // Send packets with increasing sequence numbers until a key is pressed (or STREAM_MAX_PACKETS is reached).
 // The sequence counts every attempt, so gaps seen at the receiver are packets that were lost over the air.
-static void run_stream(uint8_t *payload, size_t capacity)
+static void run_stream(uint8_t *payload, size_t capacity, uint32_t interval_ms)
 {
     uint32_t sent = 0;
     uint32_t failed = 0;
+    uint64_t bytes_sent = 0;
     const absolute_time_t t0 = get_absolute_time();
 
-    printf("STREAM START: one packet every %u ms, send any key to stop\n", (unsigned)STREAM_INTERVAL_MS);
+    printf("STREAM START: %s, send any key to stop\n", interval_ms ? "fixed interval" : "no wait (maximum speed)");
+    if (interval_ms) printf("STREAM interval: one packet every %lu ms\n", (unsigned long)interval_ms);
     while (getchar_timeout_us(0) == PICO_ERROR_TIMEOUT) {
-        const absolute_time_t next = make_timeout_time_ms(STREAM_INTERVAL_MS);
+        const absolute_time_t next = make_timeout_time_ms(interval_ms);
         const uint32_t sequence = sent + failed + 1;
         size_t size = 0;
 
         if (encode_packet(payload, capacity, &size, sequence,
-                to_ms_since_boot(get_absolute_time()), true) && send_packet(payload, size)) {
+                to_ms_since_boot(get_absolute_time()), true) && send_packet(payload, size, false)) {
             sent++;
-            printf("STREAM seq=%lu bytes=%u ok (sent %lu, failed %lu)\n",
-                (unsigned long)sequence, (unsigned)size, (unsigned long)sent, (unsigned long)failed);
+            bytes_sent += size;
+            // At maximum speed, print every 20th packet only, so the serial output does not slow the stream.
+            if (interval_ms > 0 || (sequence % 20) == 0)
+                printf("STREAM seq=%lu bytes=%u ok (sent %lu, failed %lu)\n",
+                    (unsigned long)sequence, (unsigned)size, (unsigned long)sent, (unsigned long)failed);
         } else {
             failed++;
             printf("STREAM seq=%lu FAILED (sent %lu, failed %lu)\n",
                 (unsigned long)sequence, (unsigned long)sent, (unsigned long)failed);
-            if (sx126x_reset(&radio) != SX126X_STATUS_OK)
-                puts("FAIL: reset failed; disconnect power");
         }
 
 #if STREAM_MAX_PACKETS > 0
@@ -232,8 +274,13 @@ static void run_stream(uint8_t *payload, size_t capacity)
 #endif
         sleep_until(next);  // returns at once if the packet took longer than the interval
     }
-    printf("STREAM END: sent=%lu failed=%lu in %lld ms\n", (unsigned long)sent, (unsigned long)failed,
-        (long long)(absolute_time_diff_us(t0, get_absolute_time()) / 1000));
+    const long long elapsed_ms = absolute_time_diff_us(t0, get_absolute_time()) / 1000;
+    printf("STREAM END: sent=%lu failed=%lu in %lld ms\n", (unsigned long)sent, (unsigned long)failed, elapsed_ms);
+    if (elapsed_ms > 0) {
+        const unsigned long pps_x100 = (unsigned long)((uint64_t)sent * 100000ULL / (uint64_t)elapsed_ms);
+        printf("STREAM RATE: %lu.%02lu packets/s, %lu bytes/s\n", pps_x100 / 100, pps_x100 % 100,
+            (unsigned long)(bytes_sent * 1000ULL / (uint64_t)elapsed_ms));
+    }
 }
 
 int main(void)
@@ -247,16 +294,20 @@ int main(void)
     gpio_put(UNUSED_RADIO_CS, 1);
     gpio_set_dir(UNUSED_RADIO_CS, GPIO_OUT);
     sx126x_pico_init(&radio, RADIO_SCK, RADIO_MOSI, RADIO_MISO);
-    if (sx126x_reset(&radio) != SX126X_STATUS_OK)
-        puts("FAIL: initial reset/BUSY timeout");
+    if (!radio_init())
+        puts("FAIL: radio setup failed; it will be tried again on the first send");
 
     while (true) {
-        printf("Protobuf TX test: %lu Hz, chip power %d dBm, SF7, BW125, CR4/5, sync 0x12, CRC on.\n",
-            (unsigned long)RADIO_TEST_FREQ_HZ, RADIO_TEST_CHIP_POWER_DBM);
-        puts("Attach antenna/load. Enter t to send ONE packet, s to stream packets until a key is pressed.");
+        printf("Protobuf TX test: %lu Hz, chip power %d dBm, SF%u, BW%u, CR4/5, sync 0x12, CRC on.\n",
+            (unsigned long)RADIO_TEST_FREQ_HZ, RADIO_TEST_CHIP_POWER_DBM,
+            (unsigned)modulation.sf, modulation_bw_khz());
+        puts("Attach antenna/load. Enter t for ONE packet, or stream until a key is pressed: s=1/s  m=2/s  f=4/s  x=max.");
         int ch = getchar_timeout_us(2000000);
-        if (ch == 's') {
-            run_stream(payload, sizeof payload);
+        if (ch == 's' || ch == 'm' || ch == 'f' || ch == 'x') {
+            const uint32_t interval_ms = ch == 's' ? STREAM_INTERVAL_SLOW_MS :
+                                         ch == 'm' ? STREAM_INTERVAL_MEDIUM_MS :
+                                         ch == 'f' ? STREAM_INTERVAL_FAST_MS : 0;
+            run_stream(payload, sizeof payload, interval_ms);
             sleep_ms(1000);
             while (getchar_timeout_us(0) != PICO_ERROR_TIMEOUT) {}
             continue;
@@ -266,9 +317,8 @@ int main(void)
             check_reference_payload(payload, payload_size)) {
             printf("ENCODED: callsign LEOS-TEST, sequence 42, %u bytes\n",
                 (unsigned)payload_size);
-            if (!send_packet(payload, payload_size) &&
-                sx126x_reset(&radio) != SX126X_STATUS_OK)
-                puts("FAIL: reset failed; disconnect power");
+            if (!send_packet(payload, payload_size, true))
+                puts("FAIL: send failed; the radio will be set up again on the next send");
         }
         sleep_ms(1000);
         while (getchar_timeout_us(0) != PICO_ERROR_TIMEOUT) {}

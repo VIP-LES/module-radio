@@ -88,3 +88,29 @@ target_link_libraries(pico_sx1262_rx_test PRIVATE
 pico_enable_stdio_uart(pico_sx1262_rx_test 0)
 pico_enable_stdio_usb(pico_sx1262_rx_test 1)
 pico_add_extra_outputs(pico_sx1262_rx_test)
+
+# ---------------------------------------------------------------------------
+# Cyphal -> LoRa bridge (receives on CAN, forwards leos.Packet over SX126x)
+# ---------------------------------------------------------------------------
+set(LEOS_SDK_PATH "${CMAKE_CURRENT_LIST_DIR}/../leos-sdk" CACHE PATH "VIP-LES/leos-sdk checkout (with submodules)")
+set(LEOS_CYPHAL_TYPES_PATH "${CMAKE_CURRENT_LIST_DIR}/../leos-cyphal-types" CACHE PATH "VIP-LES/leos-cyphal-types checkout")
+set(LEOS_SDK_ROOT "${LEOS_SDK_PATH}")
+list(APPEND CMAKE_MODULE_PATH "${LEOS_SDK_PATH}/cmake")
+add_subdirectory("${LEOS_SDK_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/leos-sdk")
+
+add_executable(pico_sx1262_cyphal_bridge
+    src/main.c src/module_setup.c src/cyphal_bridge.c
+    src/radio_protocol.c src/radio.c src/board_can.c
+    sx126x_hal_pico.c)
+target_include_directories(pico_sx1262_cyphal_bridge PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/src ${CMAKE_CURRENT_LIST_DIR})
+target_link_libraries(pico_sx1262_cyphal_bridge PRIVATE
+    pico_stdlib hardware_spi sx126x_driver::sx126x_driver leos_protobuf_codec
+    leos_cyphal_node leos_cyphal_transport_mcp251xfd leos_mcp251xfd leos_log)
+cyphal_generate_types(
+    TARGET pico_sx1262_cyphal_bridge
+    DSDL_DIR ${LEOS_CYPHAL_TYPES_PATH}/leos
+    DSDL_LOOKUP_DIRS ${LEOS_SDK_PATH}/external/public_regulated_data_types/uavcan)
+pico_enable_stdio_uart(pico_sx1262_cyphal_bridge 0)
+pico_enable_stdio_usb(pico_sx1262_cyphal_bridge 1)
+pico_add_extra_outputs(pico_sx1262_cyphal_bridge)

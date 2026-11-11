@@ -6,24 +6,10 @@
 #include "pb_encode.h"
 #include "packet.pb.h"       /* generated from leos-protobufs (LEOS_PROTOBUF_PATH) */
 
+_Static_assert(leos_Packet_size <= RADIO_RF_MAX_PACKET_SIZE,
+               "leos.Packet can exceed one LoRa packet (255 bytes)");
+
 static uint32_t s_seq;
-
-static void fill_header(leos_Packet *p, uint64_t t_pkt_us)
-{
-    strncpy(p->callsign, RADIO_CALLSIGN, sizeof(p->callsign) - 1U);
-    p->callsign[sizeof(p->callsign) - 1U] = '\0';
-    p->sequence = s_seq++;
-    p->timestamp_ms = t_pkt_us / 1000U;   /* uptime in ms, not UTC (per packet.proto) */
-}
-
-static size_t encode(const leos_Packet *p, uint8_t *out, size_t out_size)
-{
-    pb_ostream_t s = pb_ostream_from_buffer(out, out_size);
-    if (!pb_encode(&s, leos_Packet_fields, p)) {
-        return 0U;
-    }
-    return s.bytes_written;
-}
 
 size_t radio_protocol_pack_lowrate(const lowrate_radio_frame_t *f, uint8_t *out, size_t out_size)
 {
@@ -32,60 +18,65 @@ size_t radio_protocol_pack_lowrate(const lowrate_radio_frame_t *f, uint8_t *out,
     }
 
     leos_Packet p = leos_Packet_init_zero;
-    fill_header(&p, f->t_pkt_us);
+    strncpy(p.callsign, RADIO_CALLSIGN, sizeof(p.callsign) - 1U);
+    p.callsign[sizeof(p.callsign) - 1U] = '\0';
+    p.sequence     = s_seq++;
+    p.timestamp_ms = f->t_pkt_us / 1000U;      /* uptime in ms, not UTC (per packet.proto) */
     p.which_payload = leos_Packet_telemetry_tag;
-    p.payload.telemetry.which_data = leos_TelemetryPacket_low_rate_tag;
 
-    leos_LowRateTelemetry *low = &p.payload.telemetry.data.low_rate;
+    leos_TelemetryPacket *t = &p.payload.telemetry;
 
-    /* Purpleboard sensors (units already converted by the bridge). */
-    low->has_sensors = true;
-    low->sensors.temperature    = f->temperature_c;
-    low->sensors.pressure       = f->pressure_pa;
-    low->sensors.humidity       = f->humidity;
-    low->sensors.uvi            = f->uvs;       /* raw counts; convert to UVI if needed */
-    low->sensors.light_lux      = f->light_lux;
-    low->sensors.gas_resistance = f->gas_resistance;
+    /* Purpleboard sensors plus air quality. */
+    t->has_purple = true;
+    t->purple.temperature    = f->temperature_c;
+    t->purple.pressure       = f->pressure_pa;
+    t->purple.humidity       = f->humidity;
+    t->purple.uvi            = f->uvs;           /* raw counts; convert to UVI if needed */
+    t->purple.light_lux      = f->light_lux;
+    t->purple.gas_resistance = f->gas_resistance;
+    t->purple.has_air = true;
+    t->purple.air.pm10_env     = f->pm10_env;
+    t->purple.air.pm25_env     = f->pm25_env;
+    t->purple.air.pm100_env    = f->pm100_env;
+    t->purple.air.aqi_pm25_us  = f->aqi_pm25_us;
+    t->purple.air.aqi_pm100_us = f->aqi_pm100_us;
 
     /* Beacon / GPS. */
-    low->has_beacon = true;
-    low->beacon.has_gps = true;
-    low->beacon.gps.lat         = f->lat;
-    low->beacon.gps.lon         = f->lon;
-    low->beacon.gps.alt_m       = f->alt_m;
-    low->beacon.gps.satellites  = f->sats_used;
-    low->beacon.gps.fix         = f->gps_fix_ok ? 3U : 1U;   /* 1=no fix, 3=3D; 2D not distinguishable */
-    low->beacon.gps.climb_mps   = 0.0f;                      /* not in LowRate */
-    low->beacon.gps.hdop        = 0.0f;                      /* not in LowRate */
-    low->beacon.gps.utc_unix_ms = f->gps_utc_us / 1000U;
+    t->has_beacon = true;
+    t->beacon.has_gps = true;
+    t->beacon.gps.lat         = f->lat;
+    t->beacon.gps.lon         = f->lon;
+    t->beacon.gps.alt_m       = f->alt_m;
+    t->beacon.gps.satellites  = f->sats_used;
+    t->beacon.gps.fix         = f->gps_fix_ok ? 3U : 1U;   /* 1=no fix, 3=3D; 2D not distinguishable */
+    t->beacon.gps.climb_mps   = 0.0f;                      /* not in LowRate */
+    t->beacon.gps.hdop        = 0.0f;                      /* not in LowRate */
+    t->beacon.gps.utc_unix_ms = f->gps_utc_us / 1000U;
     /* beacon.health left unset: nothing in LowRate reports subsystem health. */
 
-    return encode(&p, out, out_size);
-}
-
-size_t radio_protocol_pack_efm(const efm_radio_frame_t *f, uint8_t *out, size_t out_size)
-{
-    if (f == NULL || out == NULL) {
-        return 0U;
+    /* Electric field mills. */
+    if (f->efm[0].present) {
+        t->has_efm0 = true;
+        t->efm0.avg_sample             = f->efm[0].avg_sample;
+        t->efm0.min_sample             = f->efm[0].min_sample;
+        t->efm0.max_sample             = f->efm[0].max_sample;
+        t->efm0.hall_events_in_interval = f->efm[0].hall_events_in_interval;
+    }
+    if (f->efm[1].present) {
+        t->has_efm1 = true;
+        t->efm1.avg_sample             = f->efm[1].avg_sample;
+        t->efm1.min_sample             = f->efm[1].min_sample;
+        t->efm1.max_sample             = f->efm[1].max_sample;
+        t->efm1.hall_events_in_interval = f->efm[1].hall_events_in_interval;
     }
 
-    leos_Packet p = leos_Packet_init_zero;
-    fill_header(&p, f->t_pkt_us);
-    p.which_payload = leos_Packet_telemetry_tag;
-    p.payload.telemetry.which_data = leos_TelemetryPacket_efm_tag;
+    /* Geiger counter. */
+    t->has_geiger = true;
+    t->geiger.hits_in_interval = f->geiger_hits;
 
-    leos_EfmReadings *efm = &p.payload.telemetry.data.efm;
-    efm->adc_count = 2;
-
-    /* ADC_0_2 only carries ch1_diff and ch4_breakbeam per ADC, so the schema's
-     * ch2_phase1 / ch3_phase2 stay at 0 (not transmitted by proto3). */
-    efm->adc[0].id            = 1;
-    efm->adc[0].ch1_diff      = f->adc1_ch1_diff;
-    efm->adc[0].ch4_breakbeam = f->adc1_ch4_breakbeam;
-
-    efm->adc[1].id            = 2;
-    efm->adc[1].ch1_diff      = f->adc2_ch1_diff;
-    efm->adc[1].ch4_breakbeam = f->adc2_ch4_breakbeam;
-
-    return encode(&p, out, out_size);
+    pb_ostream_t s = pb_ostream_from_buffer(out, out_size);
+    if (!pb_encode(&s, leos_Packet_fields, &p)) {
+        return 0U;
+    }
+    return s.bytes_written;
 }

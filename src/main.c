@@ -1,4 +1,5 @@
 #include "pico/stdlib.h"
+#include "pico/stdio_usb.h"
 
 #include "cyphal_bridge.h"
 #include "cyphal_config.h"
@@ -35,6 +36,14 @@ int main(void)
     stdio_init_all();
     leos_log_init_console(ULOG_INFO_LEVEL);   /* enables LOG_INFO / LOG_ERROR output */
 
+    /* Wait up to 5 s for a terminal so the startup lines are not missed. */
+    for (int i = 0; i < 50 && !stdio_usb_connected(); i++) {
+        sleep_ms(100);
+    }
+    LOG_INFO("=== module-radio Cyphal bridge starting ===");
+    LOG_INFO("node id %u | subject: LowRate=%u (sensors, GPS, EFM x2, geiger)",
+             (unsigned)CYPHAL_NODE_ID, (unsigned)CYPHAL_SUB_LOWRATE_ID);
+
     MCP251XFD dev;
     leos_cyphal_node_t node;
 
@@ -44,20 +53,28 @@ int main(void)
         fatal_blink();
     }
 
+    LOG_INFO("CAN + Cyphal node up");
+
     rc = radio_init();
     if (rc != 0) {
         LOG_ERROR("radio_init failed: %d", rc);
         fatal_blink();
     }
+    LOG_INFO("radio ready");
 
     subscribe(&node, CYPHAL_SUB_LOWRATE_ID, CYPHAL_SUB_LOWRATE_EXTENT,
               cyphal_bridge_on_lowrate, "LowRate");
-    subscribe(&node, CYPHAL_SUB_EFM_ID, CYPHAL_SUB_EFM_EXTENT,
-              cyphal_bridge_on_efm, "EFM");
 
+    uint32_t next_stats_ms = to_ms_since_boot(get_absolute_time()) + 5000U;
     while (true) {
+        const uint32_t t = to_ms_since_boot(get_absolute_time());
+        if ((int32_t)(t - next_stats_ms) >= 0) {
+            cyphal_bridge_log_stats();
+            next_stats_ms = t + 5000U;
+        }
         leos_mcp251xfd_task(&dev);
         leos_cyphal_task(&node);
+        cyphal_bridge_service();
         tight_loop_contents();
     }
 }

@@ -75,6 +75,11 @@ static bool radio_configure(void)
     if (!check_errors()) {
         return false;
     }
+    printf("radio config: %lu Hz, %d dBm, SF%u, BW%u kHz, CR4/5, sync 0x12, CRC on\n",
+           (unsigned long)RADIO_TEST_FREQ_HZ, (int)RADIO_TEST_CHIP_POWER_DBM,
+           (unsigned)modulation.sf,
+           modulation.bw == SX126X_LORA_BW_500 ? 500U :
+           modulation.bw == SX126X_LORA_BW_250 ? 250U : 125U);
     radio_ready = true;
     return true;
 }

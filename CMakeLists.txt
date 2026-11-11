@@ -53,6 +53,7 @@ add_library(leos_protobuf_codec STATIC
     ${LEOS_PROTOBUF_GENERATED}/beacon.pb.c
     ${LEOS_PROTOBUF_GENERATED}/command.pb.c
     ${LEOS_PROTOBUF_GENERATED}/efm.pb.c
+    ${LEOS_PROTOBUF_GENERATED}/geiger.pb.c
     ${LEOS_PROTOBUF_GENERATED}/gps.pb.c
     ${LEOS_PROTOBUF_GENERATED}/packet.pb.c
     ${LEOS_PROTOBUF_GENERATED}/purpleboard.pb.c

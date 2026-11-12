@@ -8,6 +8,8 @@
 #include "leos/mcp251xfd.h"
 #include "module_setup.h"
 #include "radio.h"
+#include "radio_command.h"
+#include "radio_protocol.h"
 
 static void subscribe(leos_cyphal_node_t *node, uint16_t id, size_t extent,
                       void (*cb)(struct CanardRxTransfer *, void *), const char *name)
@@ -62,6 +64,11 @@ int main(void)
     }
     LOG_INFO("radio ready");
 
+    /* The LED means the complete module, not just the Pico runtime, is ready. */
+    gpio_init(PICO_DEFAULT_LED_PIN);
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+    gpio_put(PICO_DEFAULT_LED_PIN, 1);
+
     subscribe(&node, CYPHAL_SUB_LOWRATE_ID, CYPHAL_SUB_LOWRATE_EXTENT,
               cyphal_bridge_on_lowrate, "LowRate");
 
@@ -75,6 +82,12 @@ int main(void)
         leos_mcp251xfd_task(&dev);
         leos_cyphal_task(&node);
         cyphal_bridge_service();
+
+        uint8_t packet[RADIO_RF_MAX_PACKET_SIZE];
+        const int received = radio_receive(packet, sizeof(packet));
+        if (received > 0) {
+            (void)radio_command_handle(&node, packet, (size_t)received);
+        }
         tight_loop_contents();
     }
 }

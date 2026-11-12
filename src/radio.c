@@ -20,6 +20,7 @@ static const sx126x_mod_params_lora_t modulation = {
 };
 
 static bool radio_ready = false;
+static bool radio_receiving = false;
 
 #define CHECK(call) do { \
     if ((call) != SX126X_STATUS_OK) { \
@@ -52,6 +53,7 @@ static bool radio_configure(void)
     };
 
     radio_ready = false;
+    radio_receiving = false;
     CHECK(sx126x_reset(&radio));
     CHECK(sx126x_wakeup(&radio));
     CHECK(sx126x_set_standby(&radio, SX126X_STANDBY_CFG_RC));
@@ -94,7 +96,11 @@ static bool transmit(const uint8_t *payload, size_t len)
         .invert_iq_is_on = false,
     };
 
+    if (radio_receiving) {
+        CHECK(sx126x_set_standby(&radio, SX126X_STANDBY_CFG_RC));
+    }
     CHECK(sx126x_set_lora_pkt_params(&radio, &packet));
+    radio_receiving = false;
     CHECK(sx126x_write_buffer(&radio, 0, payload, (uint8_t)len));
     CHECK(sx126x_clear_irq_status(&radio, SX126X_IRQ_ALL));
     CHECK(sx126x_set_tx(&radio, 1000));
@@ -140,4 +146,66 @@ int radio_send(const uint8_t *buf, size_t len)
     }
     radio_ready = false;   /* rebuild full config before the next packet */
     return -1;
+}
+
+int radio_receive(uint8_t *buf, size_t capacity)
+{
+    if (buf == NULL || capacity == 0U) {
+        return -2;
+    }
+    if (!radio_ready && !radio_configure()) {
+        return -1;
+    }
+
+    if (!radio_receiving) {
+        const sx126x_pkt_params_lora_t packet = {
+            .preamble_len_in_symb = 8,
+            .header_type = SX126X_LORA_PKT_EXPLICIT,
+            .pld_len_in_bytes = 255,
+            .crc_is_on = true,
+            .invert_iq_is_on = false,
+        };
+        if (sx126x_set_lora_pkt_params(&radio, &packet) != SX126X_STATUS_OK ||
+            sx126x_set_dio_irq_params(&radio, SX126X_IRQ_RX_DONE |
+                SX126X_IRQ_CRC_ERROR | SX126X_IRQ_HEADER_ERROR | SX126X_IRQ_TIMEOUT,
+                0, 0, 0) != SX126X_STATUS_OK ||
+            sx126x_clear_irq_status(&radio, SX126X_IRQ_ALL) != SX126X_STATUS_OK ||
+            sx126x_set_rx(&radio, 1000) != SX126X_STATUS_OK) {
+            radio_ready = false;
+            return -1;
+        }
+        radio_receiving = true;
+        return 0;
+    }
+
+    sx126x_irq_mask_t irq = 0;
+    if (sx126x_get_irq_status(&radio, &irq) != SX126X_STATUS_OK) {
+        radio_ready = false;
+        radio_receiving = false;
+        return -1;
+    }
+    if ((irq & (SX126X_IRQ_RX_DONE | SX126X_IRQ_CRC_ERROR |
+                SX126X_IRQ_HEADER_ERROR | SX126X_IRQ_TIMEOUT)) == 0U) {
+        return 0;
+    }
+
+    radio_receiving = false;
+    (void)sx126x_set_standby(&radio, SX126X_STANDBY_CFG_RC);
+    if ((irq & SX126X_IRQ_RX_DONE) != 0U) {
+        (void)sx126x_handle_rx_done(&radio);
+    }
+    (void)sx126x_clear_irq_status(&radio, SX126X_IRQ_ALL);
+    if ((irq & SX126X_IRQ_RX_DONE) == 0U ||
+        (irq & (SX126X_IRQ_CRC_ERROR | SX126X_IRQ_HEADER_ERROR)) != 0U) {
+        return 0;
+    }
+
+    sx126x_rx_buffer_status_t status = {0};
+    if (sx126x_get_rx_buffer_status(&radio, &status) != SX126X_STATUS_OK ||
+        status.pld_len_in_bytes > capacity ||
+        sx126x_read_buffer(&radio, status.buffer_start_pointer, buf,
+            status.pld_len_in_bytes) != SX126X_STATUS_OK) {
+        return -1;
+    }
+    return status.pld_len_in_bytes;
 }

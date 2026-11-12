@@ -8,6 +8,7 @@
 #define RADIO_RESET 15
 #define RADIO_BUSY 19
 #define RADIO_DIO1 17
+#define RADIO_RXEN 20
 
 #define UNUSED_RADIO_CS 14
 

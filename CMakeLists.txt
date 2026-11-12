@@ -49,6 +49,7 @@ set(NANOPB_PATH "${LEOS_PROTOBUF_PATH}/vendor/nanopb")
 
 add_library(leos_protobuf_codec STATIC
     ${NANOPB_PATH}/pb_common.c
+    ${NANOPB_PATH}/pb_decode.c
     ${NANOPB_PATH}/pb_encode.c
     ${LEOS_PROTOBUF_GENERATED}/beacon.pb.c
     ${LEOS_PROTOBUF_GENERATED}/command.pb.c
@@ -101,7 +102,7 @@ add_subdirectory("${LEOS_SDK_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/leos-sdk")
 
 add_executable(pico_sx1262_cyphal_bridge
     src/main.c src/module_setup.c src/cyphal_bridge.c
-    src/radio_protocol.c src/radio.c src/board_can.c
+    src/radio_protocol.c src/radio.c src/radio_command.c src/board_can.c
     sx126x_hal_pico.c)
 target_include_directories(pico_sx1262_cyphal_bridge PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/src ${CMAKE_CURRENT_LIST_DIR})

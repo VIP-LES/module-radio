@@ -103,6 +103,13 @@ static bool send_packet(void)
 int main(void)
 {
     stdio_init_all();
+
+    // TXEN is driven by SX1262 DIO2, while RXEN is driven by GPIO20.
+    // Keep RXEN low so the transmit and receive RF paths cannot overlap.
+    gpio_init(RADIO_RXEN);
+    gpio_put(RADIO_RXEN, 0);
+    gpio_set_dir(RADIO_RXEN, GPIO_OUT);
+
     gpio_init(UNUSED_RADIO_CS);
     gpio_put(UNUSED_RADIO_CS, 1);
     gpio_set_dir(UNUSED_RADIO_CS, GPIO_OUT);

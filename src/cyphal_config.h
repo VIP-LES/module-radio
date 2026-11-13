@@ -18,4 +18,4 @@
 #define CYPHAL_SUB_LOWRATE_ID 1500u
 
 /* Goes into leos.Packet.callsign. Max 16 ASCII characters. Set the real one. */
-#define RADIO_CALLSIGN "LEOS"
+#define RADIO_CALLSIGN "KN4MXH"

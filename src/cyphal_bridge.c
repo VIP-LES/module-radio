@@ -13,7 +13,6 @@
  * (stale or missing sensor). Forwarding those zeros makes dashboards drop to 0 (and temperature to
  * -273 C), so a block that is not valid keeps its previous good value instead. */
 static struct {
-    bool     bme_ok;                       /* a good BME688 reading has been seen */
     float    temperature_c, pressure_pa, humidity, gas_resistance;
     float    light_lux;
     uint32_t uvs;
@@ -23,18 +22,15 @@ static struct {
 static uint32_t s_bme_stale, s_tsl_stale, s_ltr_stale, s_pm_stale, s_efm_stale;   /* counts of held (not updated) blocks */
 
 /* Field mapping from the generated DSDL structs to the protobuf-ready frames.
- * Only fields that leos.Packet can carry are kept.
- * Returns false if there is no usable BME688 reading yet, in which case nothing is sent. */
-static bool lowrate_to_frame(const flight_lowrate_dsdl_t *m, lowrate_radio_frame_t *o)
+ * Only fields that leos.Packet can carry are kept. Invalid BME688 readings are
+ * forwarded verbatim so downstream diagnostics can see the reported values. */
+static void lowrate_to_frame(const flight_lowrate_dsdl_t *m, lowrate_radio_frame_t *o)
 {
-    /* BME688: 0 K or 0 Pa cannot be a real reading, so treat it as missing. */
-    if (m->bme688.temperature.kelvin > 1.0f && m->bme688.pressure._pascal > 0.0f) {
-        s_hold.bme_ok         = true;
-        s_hold.temperature_c  = m->bme688.temperature.kelvin - 273.15f;   /* schema uses degrees C */
-        s_hold.pressure_pa    = m->bme688.pressure._pascal;
-        s_hold.humidity       = m->bme688.humidity;
-        s_hold.gas_resistance = m->bme688.gas_resistance;
-    } else {
+    s_hold.temperature_c  = m->bme688.temperature.kelvin - 273.15f;   /* schema uses degrees C */
+    s_hold.pressure_pa    = m->bme688.pressure._pascal;
+    s_hold.humidity       = m->bme688.humidity;
+    s_hold.gas_resistance = m->bme688.gas_resistance;
+    if (!m->bme688.valid) {
         s_bme_stale++;
     }
     /* TSL2591 and LTR390 can legitimately read 0, so trust their own valid flags. */
@@ -62,19 +58,12 @@ static bool lowrate_to_frame(const flight_lowrate_dsdl_t *m, lowrate_radio_frame
     for (int i = 0; i < 2; i++) {
         const leos_aggregate_EFMAggregate_0_1 *e = &m->efm_aggregate[i];
         if (e->valid) {
-            s_hold.efm[i].present                 = true;
-            s_hold.efm[i].avg_sample              = e->avg_sample;
-            s_hold.efm[i].min_sample              = e->min_sample;
-            s_hold.efm[i].max_sample              = e->max_sample;
-            s_hold.efm[i].hall_events_in_interval = e->hall_events_in_interval;
+            s_hold.efm[i].present         = true;
+            s_hold.efm[i].motor_frequency = e->motor_frequency;
         } else {
             s_efm_stale++;
         }
     }
-    if (!s_hold.bme_ok) {
-        return false;
-    }
-
     memset(o, 0, sizeof(*o));
     o->t_pkt_us       = (uint64_t)to_us_since_boot(get_absolute_time());
     o->temperature_c  = s_hold.temperature_c;
@@ -98,7 +87,6 @@ static bool lowrate_to_frame(const flight_lowrate_dsdl_t *m, lowrate_radio_frame
     o->alt_m          = m->gps_data.alt_m;
     o->sats_used      = m->gps_data.sats_used;
     o->gps_utc_us     = m->gps_data.gps_utc.microsecond;
-    return true;
 }
 
 /* Latest decoded frames, handed from the callbacks to cyphal_bridge_service(). */
@@ -142,10 +130,7 @@ void cyphal_bridge_on_lowrate(struct CanardRxTransfer *transfer, void *user_refe
              (int)msg.pmsa003i.valid,
              (int)msg.bme688.temperature.kelvin, (unsigned)msg.bme688.pressure._pascal);
     lowrate_radio_frame_t frame;
-    if (!lowrate_to_frame(&msg, &frame)) {
-        LOG_ERROR("LowRate has no valid BME688 reading yet; not sending");
-        return;
-    }
+    lowrate_to_frame(&msg, &frame);
     if (s_low_pending) {
         s_low_overwritten++;
     }
@@ -185,11 +170,9 @@ void cyphal_bridge_service(void)
                      (int)frame.lon, (int)frame.alt_m,
                      (unsigned)frame.pm10_env, (unsigned)frame.pm25_env, (unsigned)frame.pm100_env,
                      (unsigned)frame.aqi_pm25_us);
-            LOG_INFO("EFM0 avg=%d min=%d max=%d hall=%u | EFM1 avg=%d min=%d max=%d hall=%u | geiger=%u",
-                     (int)frame.efm[0].avg_sample, (int)frame.efm[0].min_sample, (int)frame.efm[0].max_sample,
-                     (unsigned)frame.efm[0].hall_events_in_interval,
-                     (int)frame.efm[1].avg_sample, (int)frame.efm[1].min_sample, (int)frame.efm[1].max_sample,
-                     (unsigned)frame.efm[1].hall_events_in_interval, (unsigned)frame.geiger_hits);
+            LOG_INFO("EFM0 motor=%dHz | EFM1 motor=%dHz | geiger=%u",
+                     (int)frame.efm[0].motor_frequency,
+                     (int)frame.efm[1].motor_frequency, (unsigned)frame.geiger_hits);
             send_frame(buf, len);
         }
         return;   /* one packet per call keeps the main loop responsive */

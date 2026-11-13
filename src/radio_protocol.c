@@ -57,17 +57,11 @@ size_t radio_protocol_pack_lowrate(const lowrate_radio_frame_t *f, uint8_t *out,
     /* Electric field mills. */
     if (f->efm[0].present) {
         t->has_efm0 = true;
-        t->efm0.avg_sample             = f->efm[0].avg_sample;
-        t->efm0.min_sample             = f->efm[0].min_sample;
-        t->efm0.max_sample             = f->efm[0].max_sample;
-        t->efm0.hall_events_in_interval = f->efm[0].hall_events_in_interval;
+        t->efm0.motor_frequency = f->efm[0].motor_frequency;
     }
     if (f->efm[1].present) {
         t->has_efm1 = true;
-        t->efm1.avg_sample             = f->efm[1].avg_sample;
-        t->efm1.min_sample             = f->efm[1].min_sample;
-        t->efm1.max_sample             = f->efm[1].max_sample;
-        t->efm1.hall_events_in_interval = f->efm[1].hall_events_in_interval;
+        t->efm1.motor_frequency = f->efm[1].motor_frequency;
     }
 
     /* Geiger counter. */

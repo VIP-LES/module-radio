@@ -1,0 +1,6 @@
+# Allow the local luke group to use picotool with RP2350 in BOOTSEL mode.
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="2e8a", ATTR{idProduct}=="000f", GROUP="luke", MODE="0660"
+# Pico SDK USB stdio: permit picotool to request reboot into BOOTSEL.
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="2e8a", ATTR{idProduct}=="0009", GROUP="luke", MODE="0660"
+# Permit serial terminals for the same SDK USB device.
+SUBSYSTEM=="tty", ATTRS{idVendor}=="2e8a", ATTRS{idProduct}=="0009", GROUP="luke", MODE="0660"

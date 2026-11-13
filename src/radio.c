@@ -102,6 +102,10 @@ static bool transmit(const uint8_t *payload, size_t len)
     CHECK(sx126x_set_lora_pkt_params(&radio, &packet));
     radio_receiving = false;
     CHECK(sx126x_write_buffer(&radio, 0, payload, (uint8_t)len));
+    /* radio_receive() enables only RX-related IRQs. Restore TX_DONE here or
+     * every transmission after entering RX mode will hit the host deadline. */
+    CHECK(sx126x_set_dio_irq_params(&radio,
+        SX126X_IRQ_TX_DONE | SX126X_IRQ_TIMEOUT, 0, 0, 0));
     CHECK(sx126x_clear_irq_status(&radio, SX126X_IRQ_ALL));
     CHECK(sx126x_set_tx(&radio, 1000));
 

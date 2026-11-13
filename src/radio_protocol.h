@@ -10,10 +10,7 @@
 /* One interval summary from an electric field mill (leos.EfmData). */
 typedef struct {
     bool     present;           /* false until a valid reading has been seen */
-    float    avg_sample;
-    float    min_sample;
-    float    max_sample;
-    uint32_t hall_events_in_interval;
+    float    motor_frequency;
 } efm_interval_t;
 
 /* In-memory frame the bridge fills; radio_protocol.c encodes it into the team's leos.Packet

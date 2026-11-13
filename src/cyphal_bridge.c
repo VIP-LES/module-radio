@@ -28,10 +28,10 @@ static uint32_t s_bme_stale, s_tsl_stale, s_ltr_stale, s_pm_stale, s_efm_stale; 
 static bool lowrate_to_frame(const flight_lowrate_dsdl_t *m, lowrate_radio_frame_t *o)
 {
     /* BME688: 0 K or 0 Pa cannot be a real reading, so treat it as missing. */
-    if (m->bme688.temperature.kelvin > 1.0f && m->bme688.pressure.pascal > 0.0f) {
+    if (m->bme688.temperature.kelvin > 1.0f && m->bme688.pressure._pascal > 0.0f) {
         s_hold.bme_ok         = true;
         s_hold.temperature_c  = m->bme688.temperature.kelvin - 273.15f;   /* schema uses degrees C */
-        s_hold.pressure_pa    = m->bme688.pressure.pascal;
+        s_hold.pressure_pa    = m->bme688.pressure._pascal;
         s_hold.humidity       = m->bme688.humidity;
         s_hold.gas_resistance = m->bme688.gas_resistance;
     } else {
@@ -140,7 +140,7 @@ void cyphal_bridge_on_lowrate(struct CanardRxTransfer *transfer, void *user_refe
     LOG_INFO("LowRate valid flags: bme=%d tsl=%d ltr=%d pm=%d | raw T=%dK P=%uPa",
              (int)msg.bme688.valid, (int)msg.tsl2591.valid, (int)msg.ltr390.valid,
              (int)msg.pmsa003i.valid,
-             (int)msg.bme688.temperature.kelvin, (unsigned)msg.bme688.pressure.pascal);
+             (int)msg.bme688.temperature.kelvin, (unsigned)msg.bme688.pressure._pascal);
     lowrate_radio_frame_t frame;
     if (!lowrate_to_frame(&msg, &frame)) {
         LOG_ERROR("LowRate has no valid BME688 reading yet; not sending");

@@ -9,13 +9,12 @@
 #include "sx126x_hal_pico.h"
 
 /* Operational radio settings.
- * The ground-station radio MUST use the same: SF7, BW500, CR4/5, sync 0x12, CRC on.
- * (rx_test.c is currently BW125, so change one of them.) */
+ * The ground-station radio MUST use the same: SF9, BW125, CR4/5, sync 0x12, CRC on. */
 static const sx126x_pico_t radio = {
     .spi = RADIO_SPI, .cs = RADIO_CS, .reset = RADIO_RESET, .busy = RADIO_BUSY,
 };
 static const sx126x_mod_params_lora_t modulation = {
-    .sf = SX126X_LORA_SF7, .bw = SX126X_LORA_BW_500,
+    .sf = SX126X_LORA_SF9, .bw = SX126X_LORA_BW_125,
     .cr = SX126X_LORA_CR_4_5, .ldro = 0,
 };
 
@@ -174,7 +173,8 @@ int radio_receive(uint8_t *buf, size_t capacity)
                 SX126X_IRQ_CRC_ERROR | SX126X_IRQ_HEADER_ERROR | SX126X_IRQ_TIMEOUT,
                 0, 0, 0) != SX126X_STATUS_OK ||
             sx126x_clear_irq_status(&radio, SX126X_IRQ_ALL) != SX126X_STATUS_OK ||
-            sx126x_set_rx(&radio, 1000) != SX126X_STATUS_OK) {
+            sx126x_set_rx_with_timeout_in_rtc_step(
+                &radio, SX126X_RX_CONTINUOUS) != SX126X_STATUS_OK) {
             radio_ready = false;
             return -1;
         }

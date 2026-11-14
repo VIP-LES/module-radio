@@ -75,16 +75,17 @@ size_t radio_protocol_pack_lowrate(const lowrate_radio_frame_t *f, uint8_t *out,
     return s.bytes_written;
 }
 
-size_t radio_protocol_pack_cutdown_ack(uint8_t *out, size_t out_size)
+size_t radio_protocol_pack_cutdown_ack(
+    const char *callsign, uint32_t sequence, uint8_t *out, size_t out_size)
 {
-    if (out == NULL) {
+    if (callsign == NULL || out == NULL) {
         return 0U;
     }
 
     leos_Packet p = leos_Packet_init_zero;
-    strncpy(p.callsign, RADIO_CALLSIGN, sizeof(p.callsign) - 1U);
+    strncpy(p.callsign, callsign, sizeof(p.callsign) - 1U);
     p.callsign[sizeof(p.callsign) - 1U] = '\0';
-    p.sequence = s_seq++;
+    p.sequence = sequence;
     p.which_payload = leos_Packet_command_tag;
     p.payload.command.which_data = leos_CommandPacket_cutdown_tag;
     p.payload.command.data.cutdown.authorization_key = 0xBEEFDEADu;

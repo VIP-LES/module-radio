@@ -9,76 +9,52 @@
 #include "radio.h"
 #include "radio_protocol.h"
 
-/* Last good readings. The flight computer's aggregate can arrive with a sensor block zeroed
- * (stale or missing sensor). Forwarding those zeros makes dashboards drop to 0 (and temperature to
- * -273 C), so a block that is not valid keeps its previous good value instead. */
-static struct {
-    float    temperature_c, pressure_pa, humidity, gas_resistance;
-    float    light_lux;
-    uint32_t uvs;
-    uint32_t pm10_env, pm25_env, pm100_env, aqi_pm25_us, aqi_pm100_us;
-    efm_interval_t efm[2];
-} s_hold;
-static uint32_t s_bme_stale, s_tsl_stale, s_ltr_stale, s_pm_stale, s_efm_stale;   /* counts of held (not updated) blocks */
+static uint32_t s_bme_stale, s_tsl_stale, s_ltr_stale, s_pm_stale, s_efm_stale;
 
 /* Field mapping from the generated DSDL structs to the protobuf-ready frames.
- * Only fields that leos.Packet can carry are kept. Invalid BME688 readings are
- * forwarded verbatim so downstream diagnostics can see the reported values. */
+ * Invalid scalar sensor blocks remain zero because proto3 scalars have no null
+ * representation. Invalid EFM messages are omitted via message presence. */
 static void lowrate_to_frame(const flight_lowrate_dsdl_t *m, lowrate_radio_frame_t *o)
 {
-    s_hold.temperature_c  = m->bme688.temperature.kelvin - 273.15f;   /* schema uses degrees C */
-    s_hold.pressure_pa    = m->bme688.pressure._pascal;
-    s_hold.humidity       = m->bme688.humidity;
-    s_hold.gas_resistance = m->bme688.gas_resistance;
-    if (!m->bme688.valid) {
+    memset(o, 0, sizeof(*o));
+    o->t_pkt_us = (uint64_t)to_us_since_boot(get_absolute_time());
+
+    if (m->bme688.valid) {
+        o->temperature_c  = m->bme688.temperature.kelvin - 273.15f;
+        o->pressure_pa    = m->bme688.pressure._pascal;
+        o->humidity       = m->bme688.humidity;
+        o->gas_resistance = m->bme688.gas_resistance;
+    } else {
         s_bme_stale++;
     }
-    /* TSL2591 and LTR390 can legitimately read 0, so trust their own valid flags. */
     if (m->tsl2591.valid) {
-        s_hold.light_lux = m->tsl2591.light_lux;
+        o->light_lux = m->tsl2591.light_lux;
     } else {
         s_tsl_stale++;
     }
     if (m->ltr390.valid) {
-        s_hold.uvs = m->ltr390.uvs;
+        o->uvs = m->ltr390.uvs;
     } else {
         s_ltr_stale++;
     }
-    /* PMSA003I (air quality): trust its valid flag; 0 ug/m3 can be real. */
     if (m->pmsa003i.valid) {
-        s_hold.pm10_env     = m->pmsa003i.pm10_env;
-        s_hold.pm25_env     = m->pmsa003i.pm25_env;
-        s_hold.pm100_env    = m->pmsa003i.pm100_env;
-        s_hold.aqi_pm25_us  = m->pmsa003i.aqi_pm25_us;
-        s_hold.aqi_pm100_us = m->pmsa003i.aqi_pm100_us;
+        o->pm10_env     = m->pmsa003i.pm10_env;
+        o->pm25_env     = m->pmsa003i.pm25_env;
+        o->pm100_env    = m->pmsa003i.pm100_env;
+        o->aqi_pm25_us  = m->pmsa003i.aqi_pm25_us;
+        o->aqi_pm100_us = m->pmsa003i.aqi_pm100_us;
     } else {
         s_pm_stale++;
     }
-    /* Electric field mills: array of two, index 0 -> efm0, index 1 -> efm1. */
     for (int i = 0; i < 2; i++) {
         const leos_aggregate_EFMAggregate_0_1 *e = &m->efm_aggregate[i];
         if (e->valid) {
-            s_hold.efm[i].present         = true;
-            s_hold.efm[i].motor_frequency = e->motor_frequency;
+            o->efm[i].present = true;
+            o->efm[i].motor_frequency = e->motor_frequency;
         } else {
             s_efm_stale++;
         }
     }
-    memset(o, 0, sizeof(*o));
-    o->t_pkt_us       = (uint64_t)to_us_since_boot(get_absolute_time());
-    o->temperature_c  = s_hold.temperature_c;
-    o->pressure_pa    = s_hold.pressure_pa;
-    o->humidity       = s_hold.humidity;
-    o->gas_resistance = s_hold.gas_resistance;
-    o->light_lux      = s_hold.light_lux;
-    o->uvs            = s_hold.uvs;
-    o->pm10_env       = s_hold.pm10_env;
-    o->pm25_env       = s_hold.pm25_env;
-    o->pm100_env      = s_hold.pm100_env;
-    o->aqi_pm25_us    = s_hold.aqi_pm25_us;
-    o->aqi_pm100_us   = s_hold.aqi_pm100_us;
-    o->efm[0]         = s_hold.efm[0];
-    o->efm[1]         = s_hold.efm[1];
     o->geiger_hits    = m->geiger_aggregate.counts_in_interval;   /* no valid flag in the type */
 
     o->gps_fix_ok     = m->gps_data.fix_ok;
@@ -87,12 +63,13 @@ static void lowrate_to_frame(const flight_lowrate_dsdl_t *m, lowrate_radio_frame
     o->alt_m          = m->gps_data.alt_m;
     o->sats_used      = m->gps_data.sats_used;
     o->gps_utc_us     = m->gps_data.gps_utc.microsecond;
+
 }
 
-/* Latest decoded frames, handed from the callbacks to cyphal_bridge_service(). */
+/* Latest decoded frame, handed from the callback to cyphal_bridge_service(). */
 static lowrate_radio_frame_t s_low;
-static volatile bool         s_low_pending;
-static uint32_t              s_low_overwritten;
+static volatile bool s_low_pending;
+static uint32_t s_low_overwritten;
 
 /* Debug counters, printed by cyphal_bridge_log_stats(). */
 static struct {
@@ -100,6 +77,8 @@ static struct {
     uint32_t last_rx_ms;           /* 0 = never */
 } s_ls;
 static uint32_t s_pack_fail;
+static uint32_t s_tx_late;
+static uint32_t s_tx_max_ms;
 
 static uint32_t now_ms(void) { return to_ms_since_boot(get_absolute_time()); }
 
@@ -111,8 +90,8 @@ void cyphal_bridge_on_lowrate(struct CanardRxTransfer *transfer, void *user_refe
     }
     s_ls.rx++;
     s_ls.last_rx_ms = now_ms() | 1u;
-    LOG_INFO("rx LowRate #%u: %u bytes (extent %u)", (unsigned)s_ls.rx,
-             (unsigned)transfer->payload.size, (unsigned)CYPHAL_SUB_LOWRATE_EXTENT);
+    LOG_DEBUG("rx lowrate #%u %uB", (unsigned)s_ls.rx,
+              (unsigned)transfer->payload.size);
 
     flight_lowrate_dsdl_t msg;
     memset(&msg, 0, sizeof(msg));
@@ -125,10 +104,9 @@ void cyphal_bridge_on_lowrate(struct CanardRxTransfer *transfer, void *user_refe
                   (unsigned)transfer->payload.size);
         return;
     }
-    LOG_INFO("LowRate valid flags: bme=%d tsl=%d ltr=%d pm=%d | raw T=%dK P=%uPa",
-             (int)msg.bme688.valid, (int)msg.tsl2591.valid, (int)msg.ltr390.valid,
-             (int)msg.pmsa003i.valid,
-             (int)msg.bme688.temperature.kelvin, (unsigned)msg.bme688.pressure._pascal);
+    LOG_DEBUG("lowrate valid bme=%d tsl=%d ltr=%d pm=%d",
+              (int)msg.bme688.valid, (int)msg.tsl2591.valid,
+              (int)msg.ltr390.valid, (int)msg.pmsa003i.valid);
     lowrate_radio_frame_t frame;
     lowrate_to_frame(&msg, &frame);
     if (s_low_pending) {
@@ -140,13 +118,21 @@ void cyphal_bridge_on_lowrate(struct CanardRxTransfer *transfer, void *user_refe
 
 static void send_frame(const uint8_t *buf, size_t len)
 {
+    const uint32_t start_ms = now_ms();
     const int tx = radio_send(buf, len);
+    const uint32_t tx_ms = now_ms() - start_ms;
+    if (tx_ms > s_tx_max_ms) {
+        s_tx_max_ms = tx_ms;
+    }
+    if (tx_ms >= CYPHAL_LOWRATE_TARGET_PERIOD_MS) {
+        s_tx_late++;
+    }
     if (tx != 0) {
         s_ls.tx_fail++;
-        LOG_ERROR("radio_send failed: %d", tx);
+        LOG_ERROR("TX failed rc=%d time=%ums", tx, (unsigned)tx_ms);
     } else {
         s_ls.tx_ok++;
-        LOG_INFO("tx %u bytes OK", (unsigned)len);
+        LOG_DEBUG("tx %uB %ums", (unsigned)len, (unsigned)tx_ms);
     }
 }
 
@@ -162,17 +148,6 @@ void cyphal_bridge_service(void)
             s_pack_fail++;
             LOG_ERROR("pack lowrate failed");
         } else {
-            /* Integer formatting only, so this works without float printf. */
-            LOG_INFO("LowRate: T=%dC P=%uPa RH=%d%% lux=%d | GPS fix=%u sats=%u lat=%d.%04u lon=%d alt=%dm | PM1=%u PM2.5=%u PM10=%u AQI25=%u",
-                     (int)frame.temperature_c, (unsigned)frame.pressure_pa, (int)frame.humidity,
-                     (int)frame.light_lux, frame.gps_fix_ok ? 3U : 1U, (unsigned)frame.sats_used,
-                     (int)frame.lat, (unsigned)((frame.lat - (int)frame.lat) * (frame.lat < 0 ? -10000 : 10000)),
-                     (int)frame.lon, (int)frame.alt_m,
-                     (unsigned)frame.pm10_env, (unsigned)frame.pm25_env, (unsigned)frame.pm100_env,
-                     (unsigned)frame.aqi_pm25_us);
-            LOG_INFO("EFM0 motor=%dHz | EFM1 motor=%dHz | geiger=%u",
-                     (int)frame.efm[0].motor_frequency,
-                     (int)frame.efm[1].motor_frequency, (unsigned)frame.geiger_hits);
             send_frame(buf, len);
         }
         return;   /* one packet per call keeps the main loop responsive */
@@ -190,16 +165,57 @@ static void age(char *out, size_t n, uint32_t last_ms)
 
 void cyphal_bridge_log_stats(void)
 {
+    static uint32_t previous_ms;
+    static uint32_t previous_rx;
+    static uint32_t previous_tx;
+    static uint32_t previous_fail;
+    static uint32_t previous_late;
+    static uint32_t previous_overwritten;
+
+    const uint32_t current_ms = now_ms();
+    const uint32_t elapsed_ms = current_ms - previous_ms;
+    const uint32_t rx = s_ls.rx - previous_rx;
+    const uint32_t tx = s_ls.tx_ok - previous_tx;
+    const uint32_t fail = s_ls.tx_fail - previous_fail;
+    const uint32_t late = s_tx_late - previous_late;
+    const uint32_t dropped = s_low_overwritten - previous_overwritten;
+    const uint32_t rx_rate_x100 = elapsed_ms ?
+        (uint32_t)((uint64_t)rx * 100000ULL / elapsed_ms) : 0U;
+    const uint32_t tx_rate_x100 = elapsed_ms ?
+        (uint32_t)((uint64_t)tx * 100000ULL / elapsed_ms) : 0U;
+    const uint32_t target_x100 = CYPHAL_LOWRATE_TARGET_PPS * 100U;
+    const bool slow = tx_rate_x100 < (target_x100 * 9U / 10U);
+
     char a[16];
     age(a, sizeof(a), s_ls.last_rx_ms);
-    LOG_INFO("STATS up=%us | LowRate rx=%u decfail=%u tx=%u txfail=%u skipped=%u last=%s",
-             (unsigned)(now_ms() / 1000U), (unsigned)s_ls.rx, (unsigned)s_ls.dec_fail,
-             (unsigned)s_ls.tx_ok, (unsigned)s_ls.tx_fail, (unsigned)s_low_overwritten, a);
-    LOG_INFO("STATS      | held stale blocks: bme=%u tsl=%u ltr=%u pm=%u efm=%u",
-             (unsigned)s_bme_stale, (unsigned)s_tsl_stale, (unsigned)s_ltr_stale, (unsigned)s_pm_stale,
-             (unsigned)s_efm_stale);
-    LOG_INFO("STATS      | packfail=%u", (unsigned)s_pack_fail);
     if (s_ls.rx == 0U) {
-        LOG_ERROR("STATS: no LowRate received yet (check CAN wiring, bitrate, fc-lowrate-aggregate on the FC)");
+        LOG_ERROR("TX no Cyphal input last=%s", a);
+    } else if (fail != 0U) {
+        LOG_ERROR("TX rate=%u.%02upps target=1 rx=%u.%02u late=%u fail=%u skip=%u max=%ums",
+                  (unsigned)(tx_rate_x100 / 100U), (unsigned)(tx_rate_x100 % 100U),
+                  (unsigned)(rx_rate_x100 / 100U), (unsigned)(rx_rate_x100 % 100U),
+                  (unsigned)late, (unsigned)fail, (unsigned)dropped, (unsigned)s_tx_max_ms);
+    } else if (slow || late != 0U || dropped != 0U) {
+        LOG_WARNING("TX rate=%u.%02upps target=1 rx=%u.%02u late=%u fail=0 skip=%u max=%ums",
+                    (unsigned)(tx_rate_x100 / 100U), (unsigned)(tx_rate_x100 % 100U),
+                    (unsigned)(rx_rate_x100 / 100U), (unsigned)(rx_rate_x100 % 100U),
+                    (unsigned)late, (unsigned)dropped, (unsigned)s_tx_max_ms);
+    } else {
+        LOG_INFO("TX rate=%u.%02upps target=1 rx=%u.%02u late=0 fail=0 skip=0 max=%ums",
+                 (unsigned)(tx_rate_x100 / 100U), (unsigned)(tx_rate_x100 % 100U),
+                 (unsigned)(rx_rate_x100 / 100U), (unsigned)(rx_rate_x100 % 100U),
+                 (unsigned)s_tx_max_ms);
     }
+
+    LOG_DEBUG("held bme=%u tsl=%u ltr=%u pm=%u efm=%u decode=%u pack=%u",
+              (unsigned)s_bme_stale, (unsigned)s_tsl_stale, (unsigned)s_ltr_stale,
+              (unsigned)s_pm_stale, (unsigned)s_efm_stale,
+              (unsigned)s_ls.dec_fail, (unsigned)s_pack_fail);
+    previous_ms = current_ms;
+    previous_rx = s_ls.rx;
+    previous_tx = s_ls.tx_ok;
+    previous_fail = s_ls.tx_fail;
+    previous_late = s_tx_late;
+    previous_overwritten = s_low_overwritten;
+    s_tx_max_ms = 0U;
 }

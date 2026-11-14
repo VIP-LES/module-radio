@@ -72,12 +72,12 @@ int main(void)
     subscribe(&node, CYPHAL_SUB_LOWRATE_ID, CYPHAL_SUB_LOWRATE_EXTENT,
               cyphal_bridge_on_lowrate, "LowRate");
 
-    uint32_t next_stats_ms = to_ms_since_boot(get_absolute_time()) + 5000U;
+    uint32_t next_stats_ms = to_ms_since_boot(get_absolute_time()) + 10000U;
     while (true) {
         const uint32_t t = to_ms_since_boot(get_absolute_time());
         if ((int32_t)(t - next_stats_ms) >= 0) {
             cyphal_bridge_log_stats();
-            next_stats_ms = t + 5000U;
+            next_stats_ms = t + 10000U;
         }
         leos_mcp251xfd_task(&dev);
         leos_cyphal_task(&node);

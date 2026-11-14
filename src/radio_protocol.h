@@ -46,10 +46,12 @@ typedef struct {
     float    alt_m;
     uint8_t  sats_used;
     uint64_t gps_utc_us;
+
 } lowrate_radio_frame_t;
 
 /* Return encoded protobuf length, or 0 on failure / buffer too small. */
 size_t radio_protocol_pack_lowrate(const lowrate_radio_frame_t *f, uint8_t *out, size_t out_size);
 
-/* Encode a cutdown acknowledgment using the distinct acknowledgment key. */
-size_t radio_protocol_pack_cutdown_ack(uint8_t *out, size_t out_size);
+/* Encode a cutdown acknowledgment which echoes the command identity. */
+size_t radio_protocol_pack_cutdown_ack(
+    const char *callsign, uint32_t sequence, uint8_t *out, size_t out_size);

@@ -8,7 +8,7 @@
 #include "radio.h"
 #include "radio_protocol.h"
 
-#define CUTDOWN_ACK_TURNAROUND_MS 3000U
+#define CUTDOWN_ACK_TURNAROUND_MS 100U
 
 bool radio_command_handle(
     leos_cyphal_node_t *node, const uint8_t *data, size_t size)
@@ -33,7 +33,7 @@ bool radio_command_handle(
         .priority = CanardPriorityHigh,
         .transfer_kind = CanardTransferKindRequest,
         .port_id = CUTDOWN_SERVICE_PORT_ID,
-        .remote_node_id = FLIGHT_COMPUTER_NODE_ID,
+        .remote_node_id = CUTDOWN_NODE_ID,
         .transfer_id = transfer_id++,
     };
     const struct CanardPayload payload = {.size = 0U, .data = NULL};
@@ -45,7 +45,8 @@ bool radio_command_handle(
     LOG_INFO("authorized cutdown request queued for flight computer");
 
     uint8_t ack[RADIO_RF_MAX_PACKET_SIZE];
-    const size_t ack_size = radio_protocol_pack_cutdown_ack(ack, sizeof(ack));
+    const size_t ack_size = radio_protocol_pack_cutdown_ack(
+        packet.callsign, packet.sequence, ack, sizeof(ack));
     if (ack_size == 0U) {
         LOG_ERROR("failed to encode cutdown acknowledgment");
     } else {
@@ -53,8 +54,7 @@ bool radio_command_handle(
         if (radio_send(ack, ack_size) != 0) {
             LOG_ERROR("failed to transmit cutdown acknowledgment");
         } else {
-            LOG_INFO("cutdown acknowledgment transmitted after %u ms turnaround",
-                     (unsigned)CUTDOWN_ACK_TURNAROUND_MS);
+            LOG_INFO("cutdown acknowledgment transmitted");
         }
     }
     return true;

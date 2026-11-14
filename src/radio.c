@@ -8,8 +8,8 @@
 #include "sx126x.h"
 #include "sx126x_hal_pico.h"
 
-/* Radio settings: taken from tx_protobuf_test.c.
- * The ground-station receiver MUST use the same: SF7, BW500, CR4/5, sync 0x12, CRC on.
+/* Operational radio settings.
+ * The ground-station radio MUST use the same: SF7, BW500, CR4/5, sync 0x12, CRC on.
  * (rx_test.c is currently BW125, so change one of them.) */
 static const sx126x_pico_t radio = {
     .spi = RADIO_SPI, .cs = RADIO_CS, .reset = RADIO_RESET, .busy = RADIO_BUSY,
@@ -64,9 +64,9 @@ static bool radio_configure(void)
     CHECK(sx126x_set_reg_mode(&radio, SX126X_REG_MODE_LDO));
     CHECK(sx126x_set_dio2_as_rf_sw_ctrl(&radio, true));
     CHECK(sx126x_set_pkt_type(&radio, SX126X_PKT_TYPE_LORA));
-    CHECK(sx126x_set_rf_freq(&radio, RADIO_TEST_FREQ_HZ));
+    CHECK(sx126x_set_rf_freq(&radio, RADIO_FREQ_HZ));
     CHECK(sx126x_set_pa_cfg(&radio, &pa));
-    CHECK(sx126x_set_tx_params(&radio, RADIO_TEST_CHIP_POWER_DBM, SX126X_RAMP_200_US));
+    CHECK(sx126x_set_tx_params(&radio, RADIO_CHIP_POWER_DBM, SX126X_RAMP_200_US));
     CHECK(sx126x_set_lora_mod_params(&radio, &modulation));
     CHECK(sx126x_set_lora_sync_word(&radio, 0x12));
     CHECK(sx126x_set_buffer_base_address(&radio, 0, 0));
@@ -78,7 +78,7 @@ static bool radio_configure(void)
         return false;
     }
     printf("radio config: %lu Hz, %d dBm, SF%u, BW%u kHz, CR4/5, sync 0x12, CRC on\n",
-           (unsigned long)RADIO_TEST_FREQ_HZ, (int)RADIO_TEST_CHIP_POWER_DBM,
+           (unsigned long)RADIO_FREQ_HZ, (int)RADIO_CHIP_POWER_DBM,
            (unsigned)modulation.sf,
            modulation.bw == SX126X_LORA_BW_500 ? 500U :
            modulation.bw == SX126X_LORA_BW_250 ? 250U : 125U);

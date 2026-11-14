@@ -10,7 +10,7 @@
 #include "tx_payload.h"
 
 _Static_assert(leos_Packet_size <= 255, "Protobuf exceeds SX1262 packet limit");
-_Static_assert(RADIO_TEST_FREQ_HZ >= 902000000u && RADIO_TEST_FREQ_HZ <= 928000000u,
+_Static_assert(RADIO_FREQ_HZ >= 902000000u && RADIO_FREQ_HZ <= 928000000u,
     "Update image calibration before selecting another band");
 
 // Stream mode: type s, m, f or x to send packets until any key is pressed.
@@ -170,9 +170,9 @@ static bool radio_init(void)
     CHECK(sx126x_set_reg_mode(&radio, SX126X_REG_MODE_LDO));
     CHECK(sx126x_set_dio2_as_rf_sw_ctrl(&radio, true));
     CHECK(sx126x_set_pkt_type(&radio, SX126X_PKT_TYPE_LORA));
-    CHECK(sx126x_set_rf_freq(&radio, RADIO_TEST_FREQ_HZ));
+    CHECK(sx126x_set_rf_freq(&radio, RADIO_FREQ_HZ));
     CHECK(sx126x_set_pa_cfg(&radio, &pa));
-    CHECK(sx126x_set_tx_params(&radio, RADIO_TEST_CHIP_POWER_DBM, SX126X_RAMP_200_US));
+    CHECK(sx126x_set_tx_params(&radio, RADIO_CHIP_POWER_DBM, SX126X_RAMP_200_US));
     CHECK(sx126x_set_lora_mod_params(&radio, &modulation));
     CHECK(sx126x_set_lora_sync_word(&radio, 0x12));
     CHECK(sx126x_set_buffer_base_address(&radio, 0, 0));
@@ -306,7 +306,7 @@ int main(void)
 
     while (true) {
         printf("Protobuf TX test: %lu Hz, chip power %d dBm, SF%u, BW%u, CR4/5, sync 0x12, CRC on.\n",
-            (unsigned long)RADIO_TEST_FREQ_HZ, RADIO_TEST_CHIP_POWER_DBM,
+            (unsigned long)RADIO_FREQ_HZ, RADIO_CHIP_POWER_DBM,
             (unsigned)modulation.sf, modulation_bw_khz());
         puts("Attach antenna/load. Enter t for ONE packet, or stream until a key is pressed: s=1/s  m=2/s  f=4/s  x=max.");
         int ch = getchar_timeout_us(2000000);

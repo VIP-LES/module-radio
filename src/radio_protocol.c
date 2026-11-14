@@ -74,3 +74,24 @@ size_t radio_protocol_pack_lowrate(const lowrate_radio_frame_t *f, uint8_t *out,
     }
     return s.bytes_written;
 }
+
+size_t radio_protocol_pack_cutdown_ack(uint8_t *out, size_t out_size)
+{
+    if (out == NULL) {
+        return 0U;
+    }
+
+    leos_Packet p = leos_Packet_init_zero;
+    strncpy(p.callsign, RADIO_CALLSIGN, sizeof(p.callsign) - 1U);
+    p.callsign[sizeof(p.callsign) - 1U] = '\0';
+    p.sequence = s_seq++;
+    p.which_payload = leos_Packet_command_tag;
+    p.payload.command.which_data = leos_CommandPacket_cutdown_tag;
+    p.payload.command.data.cutdown.authorization_key = 0xBEEFDEADu;
+
+    pb_ostream_t s = pb_ostream_from_buffer(out, out_size);
+    if (!pb_encode(&s, leos_Packet_fields, &p)) {
+        return 0U;
+    }
+    return s.bytes_written;
+}

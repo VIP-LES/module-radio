@@ -50,3 +50,6 @@ typedef struct {
 
 /* Return encoded protobuf length, or 0 on failure / buffer too small. */
 size_t radio_protocol_pack_lowrate(const lowrate_radio_frame_t *f, uint8_t *out, size_t out_size);
+
+/* Encode a cutdown acknowledgment using the distinct acknowledgment key. */
+size_t radio_protocol_pack_cutdown_ack(uint8_t *out, size_t out_size);

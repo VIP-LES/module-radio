@@ -6,7 +6,7 @@
 #include "config.h"
 #include "tx_payload.h"
 
-_Static_assert(RADIO_TEST_FREQ_HZ >= 902000000u && RADIO_TEST_FREQ_HZ <= 928000000u,
+_Static_assert(RADIO_FREQ_HZ >= 902000000u && RADIO_FREQ_HZ <= 928000000u,
     "Update image calibration before selecting another band");
 
 #define CHECK(call) do { \
@@ -41,7 +41,7 @@ static bool initialize_receiver(void)
     // DIO2 holds TXEN low in RX. RXEN must be separately held at 3.3 V.
     CHECK(sx126x_set_dio2_as_rf_sw_ctrl(&radio, true));
     CHECK(sx126x_set_pkt_type(&radio, SX126X_PKT_TYPE_LORA));
-    CHECK(sx126x_set_rf_freq(&radio, RADIO_TEST_FREQ_HZ));
+    CHECK(sx126x_set_rf_freq(&radio, RADIO_FREQ_HZ));
     CHECK(sx126x_set_lora_mod_params(&radio, &modulation));
     CHECK(sx126x_set_lora_pkt_params(&radio, &packet));
     CHECK(sx126x_set_lora_sync_word(&radio, 0x12));
@@ -117,7 +117,7 @@ int main(void)
             while (true) {
                 if (time_reached(report)) {
                     printf("Listening: %lu Hz, SF7, BW125, CR4/5, sync 0x12, CRC on\n",
-                        (unsigned long)RADIO_TEST_FREQ_HZ);
+                        (unsigned long)RADIO_FREQ_HZ);
                     report = make_timeout_time_ms(10000);
                 }
                 if (!receive_packet()) break;

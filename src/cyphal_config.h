@@ -9,7 +9,7 @@
 /* Radio cutdown requests target the flight computer's Cyphal node. */
 #define FLIGHT_COMPUTER_NODE_ID 10u
 #define CUTDOWN_AUTHORIZATION_KEY 0xDEADBEEFu
-#define CUTDOWN_SERVICE_PORT_ID 101u /* leos.cutdown.Cutdown.0.2 */
+#define CUTDOWN_SERVICE_PORT_ID 104u /* leos.cutdown.RadioCutdown.0.1 */
 
 /* Fixed subject IDs, read from the FC's generated DSDL (fc/config.py):
  *   leos.aggregate.LowRate_0_1 -> 1500   (carries the sensors, GPS, both EFMs and the geiger)
